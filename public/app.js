@@ -372,6 +372,7 @@ async function viewMeal(id) {
     ${a ? `<div class="row wrapflex">
       <a class="btn" href="#/edit/${m.id}">${icon('pencil')}Edit</a>
       <a class="btn" href="#/new?from=${m.id}">${icon('repeat')}Cook again</a>
+      <button class="btn" data-act="reprice" data-id="${m.id}">${icon('refresh-cw')}Update prices from Tesco</button>
       <button class="btn danger" data-act="del-meal" data-id="${m.id}">${icon('trash-2')}Delete</button></div>` : ''}
     </div>
     </div>
@@ -575,7 +576,8 @@ async function viewMe() {
       <h2 style="margin-top:16px">Splitting</h2>
       <label>Cook's share of a normal portion (0 to 1). 0.5 means you pay half what everyone else pays.</label>
       <input id="s-cook_weight" inputmode="decimal" value="${esc(s.cook_weight || '0.5')}">
-      <button class="btn primary block" style="margin-top:14px">Save settings</button></form>`;
+      <button class="btn primary block" style="margin-top:14px">Save settings</button>
+      <button type="button" class="btn block" style="margin-top:10px" data-act="reprice">${icon('refresh-cw')}Update all upcoming meal prices from Tesco</button></form>`;
   }
   shell(`<h1>Profile</h1>
     <form class="card pad" data-form="profile">
@@ -639,6 +641,12 @@ const ACTIONS = {
     await api('/meals/' + el.dataset.id, 'DELETE');
     location.hash = el.dataset.back ? '#/' + el.dataset.back : '#/';
     render();
+  },
+  reprice: async (el) => {
+    const r = await api('/reprice', 'POST', el.dataset.id ? { meal_id: el.dataset.id } : {});
+    const n = r.changes.length;
+    toast(n ? `Updated ${n} price${n === 1 ? '' : 's'} from Tesco` + (r.unmatched.length ? `, ${r.unmatched.length} not in the catalogue` : '') : 'Prices already match Tesco' + (r.unmatched.length ? `, ${r.unmatched.length} not in the catalogue` : ''));
+    if (el.dataset.id) await refresh();
   },
   'add-ing': () => { readForm(); F.ingredients.push({ name: '', qty: '', price: '', have: 0 }); renderForm(); },
   'rm-ing': (el) => { readForm(); F.ingredients.splice(Number(el.dataset.n), 1); if (!F.ingredients.length) F.ingredients.push({ name: '', qty: '', price: '', have: 0 }); renderForm(); },

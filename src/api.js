@@ -84,6 +84,35 @@ async function getSettings(env) {
   return s;
 }
 
+
+// ---- reprice ingredients from the Tesco catalogue ----------------------------------
+const ALIAS = { pickles: 'sliced gherkins', pickle: 'sliced gherkins', gherkins: 'sliced gherkins', onions: 'brown onions', onion: 'brown onions', lettuce: 'iceberg lettuce', 'beef mince': 'beef mince 15% fat', mince: 'beef mince 15% fat', mayo: 'mayonnaise', ketchup: 'tomato ketchup', 'cheddar': 'mature cheddar', cheese: 'mature cheddar', wraps: 'tortilla wraps', 'tortilla wrap': 'tortilla wraps', tomatoes: 'chopped tomatoes', rice: 'long grain rice', pasta: 'penne pasta', milk: 'semi skimmed milk', eggs: 'eggs' };
+const stem = (w) => (w.length > 4 && w.endsWith('ies') ? w.slice(0, -3) + 'y' : w.length > 3 && w.endsWith('es') && /(ch|sh|x|s|o)es$/.test(w) ? w.slice(0, -2) : w.length > 3 && w.endsWith('s') ? w.slice(0, -1) : w);
+const toks = (s) => String(s).toLowerCase().replace(/\([^)]*\)/g, ' ').replace(/[^a-z ]/g, ' ').split(/\s+/).filter(Boolean).map(stem);
+const measure = (s) => { const m = String(s || '').toLowerCase().match(/(\d+(?:\.\d+)?)\s*(kg|g|ml|l|litre|ltr)\b/); if (!m) return null; const v = parseFloat(m[1]); return m[2] === 'kg' || m[2] === 'l' || m[2] === 'litre' || m[2] === 'ltr' ? v * 1000 : v; };
+function packsFor(qty, pack) {
+  const want = measure(qty), have = measure(pack);
+  let n;
+  if (want && have) n = Math.ceil(want / have - 0.05);
+  else { const m = String(qty || '').match(/^\s*(\d+(?:\.\d+)?)/); n = m ? Math.ceil(parseFloat(m[1])) : 1; }
+  return Math.min(20, Math.max(1, n));
+}
+function matchProduct(name, qty, products) {
+  const key = name.trim().toLowerCase();
+  const want = toks(ALIAS[key] || name);
+  if (!want.length) return null;
+  const cands = [];
+  for (const p of products) {
+    const t = toks(p.name);
+    if (!want.every((w) => t.includes(w))) continue;
+    const packs = packsFor(qty, p.pack);
+    cands.push({ p, packs, extra: t.length - want.length, cost: packs * p.price_pence });
+  }
+  if (!cands.length) return null;
+  cands.sort((a, b) => a.extra - b.extra || a.cost - b.cost);
+  return cands[0];
+}
+
 // ---- cost + split -------------------------------------------------------
 // total = admin override if set, otherwise the price of ingredients not yet ticked.
 // Diners (everyone opted in except the cook) pay an equal share; the cook counts as
@@ -310,6 +339,27 @@ async function route(request, env, url, p, method) {
       if (stmts.length) await env.DB.batch(stmts);
       return json({ ok: true });
     }
+  }
+
+  if (p[0] === 'reprice' && method === 'POST') {
+    if (!admin) return fail('Only the cook can do this', 403);
+    const b = await body();
+    const products = (await env.DB.prepare('SELECT name, unit, pack, price_pence, product FROM products').all()).results;
+    const rows = (b.meal_id
+      ? await env.DB.prepare('SELECT i.id, i.name, i.qty, i.price_pence, m.id AS mid, m.title FROM ingredients i JOIN meals m ON m.id = i.meal_id WHERE m.id = ?').bind(Number(b.meal_id)).all()
+      : await env.DB.prepare("SELECT i.id, i.name, i.qty, i.price_pence, m.id AS mid, m.title FROM ingredients i JOIN meals m ON m.id = i.meal_id WHERE m.status IN ('scheduled','requested') AND (m.date IS NULL OR m.date >= ?)").bind(today()).all()).results;
+    const meals = [...new Set(rows.map((r) => r.mid))];
+    const stmts = [], changes = [], unmatched = [];
+    for (const i of rows) {
+      const hit = matchProduct(i.name, i.qty, products);
+      if (!hit) { unmatched.push(`${i.title}: ${i.name}`); continue; }
+      if (hit.cost !== i.price_pence) {
+        stmts.push(env.DB.prepare('UPDATE ingredients SET price_pence = ? WHERE id = ?').bind(hit.cost, i.id));
+        changes.push({ meal: i.title, name: i.name, qty: i.qty, from: i.price_pence, to: hit.cost, product: hit.p.product || hit.p.name, packs: hit.packs });
+      }
+    }
+    for (let k = 0; k < stmts.length; k += 40) await env.DB.batch(stmts.slice(k, k + 40));
+    return json({ meals: meals.length, changes, unmatched });
   }
 
   if (p[0] === 'price-bank' && method === 'GET') {
