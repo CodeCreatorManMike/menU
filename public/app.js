@@ -17,7 +17,13 @@ function drawIcons() {
   requestAnimationFrame(() => { iconQueued = false; if (window.lucide) window.lucide.createIcons(); });
 }
 new MutationObserver(drawIcons).observe(document.getElementById('app'), { childList: true, subtree: true });
-window.addEventListener('load', drawIcons);
+window.addEventListener('load', () => {
+  if (window.lucide) return drawIcons();
+  const f = document.createElement('script'); // second CDN if the first one was blocked
+  f.src = 'https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js';
+  f.onload = drawIcons;
+  document.head.appendChild(f);
+});
 const isAdmin = () => !!(S.me && S.me.is_admin);
 
 async function api(path, method = 'GET', body) {
@@ -88,7 +94,7 @@ function shell(inner, active) {
   const tab = (href, ic, label, key) => `<a href="${href}" class="${active === key ? 'on' : ''}"><b>${icon(ic)}</b>${label}</a>`;
   $app.innerHTML = `
     <div class="top">
-      <a class="brand" href="#/">Flat Feast</a>
+      <a class="brand" href="#/"><span class="logo">${icon('chef-hat')}</span>Flat Feast</a>
       <a href="#/me" aria-label="Profile">${avatar(S.me)}</a>
     </div>
     <div class="wrap">${inner}</div>
@@ -102,65 +108,85 @@ function shell(inner, active) {
 }
 
 // ---------- auth + onboarding ----------
+const mav = (t) => `<span class="av sm">${t}</span>`;
 const SLIDES = [
-  ['1', 'Welcome to Flat Feast', 'Your flat cook posts the meals. You choose which ones you want, and the cost is split fairly.'],
-  ['2', "Today's meal and what's coming", 'The home page shows tonight\'s meal and everything coming up, with the price per person.'],
-  ['3', 'Opt in or opt out', 'Tap "I\'m in" or "Count me out" on any meal. Your share updates as more people join. No reply means you are not counted.'],
-  ['4', 'Check off ingredients', 'If you already have an ingredient in the cupboard, tick it. The meal price only counts what is still needed.'],
-  ['5', 'Calendar and requests', 'See meals by date in the calendar, or request a meal you fancy with a name, photo and ingredients.'],
-  ['6', 'Pay the cook', 'The Pay page shows what you owe, with the bank details ready to copy one item at a time. Mark it paid when you have sent it.'],
+  { title: 'Cook once, share the table', text: 'Your flat cook posts the meals. You choose what you want, and the cost is split fairly.',
+    art: () => `<div class="ob-logo">${icon('chef-hat')}</div>
+      <div class="ob-chips"><span class="chip">${icon('utensils')}Meals</span><span class="chip">${icon('users')}Flatmates</span><span class="chip">${icon('pound-sterling')}Fair split</span></div>` },
+  { title: "See what's cooking", text: "The home page shows tonight's meal and everything coming up, with the price per person.",
+    art: () => `<div class="mini"><div class="mini-hero">${icon('utensils')}</div>
+      <div class="row between" style="margin-top:10px"><b>Beef Chilli</b><span class="badge">Today</span></div>
+      <div class="row between" style="margin-top:6px"><span class="muted">&pound;5.76 each</span><span class="stack">${mav('A')}${mav('B')}${mav('C')}</span></div></div>` },
+  { title: "Say if you're in", text: 'Tap I\'m in or Count me out on any meal. Your share updates as people join. No reply means you are not counted.',
+    art: () => `<div class="mini"><div class="row between"><b>Beef Chilli</b><span class="muted">3 in, 1 out</span></div>
+      <div class="seg" style="margin-top:12px"><span class="btn in">${icon('check')}I'm in</span><span class="btn">${icon('x')}Count me out</span></div>
+      <div class="row" style="margin-top:12px"><span class="stack">${mav('A')}${mav('B')}${mav('C')}</span><span class="muted">your share &pound;5.76</span></div></div>` },
+  { title: 'Tick off what you have', text: 'Already got rice in the cupboard? Tick it. The meal price only counts what is still needed.',
+    art: () => `<div class="mini">
+      <div class="ing done"><span class="tick on">${icon('check')}</span><div class="grow nm">Rice</div><span class="muted">&pound;2.00</span></div>
+      <div class="ing"><span class="tick"></span><div class="grow nm">Beef mince</div><span>&pound;6.50</span></div>
+      <div class="ing"><span class="tick"></span><div class="grow nm">Chopped tomatoes</div><span>&pound;2.80</span></div>
+      <div class="totals" style="margin-top:8px"><div class="line"><span>Still to buy</span><b>&pound;9.30</b></div></div></div>` },
+  { title: 'Plan ahead, ask for favourites', text: 'See meals by date in the calendar, or request a meal you fancy with a name, photo and ingredients.',
+    art: () => `<div class="mini"><div class="mini-cal">${['M','T','W','T','F','S','S'].map((d) => `<span class="dow">${d}</span>`).join('')}
+      <span>9</span><span>10</span><span class="hot">11</span><span>12</span><span class="dot">13</span><span>14</span><span>15</span></div>
+      <div class="chip" style="margin-top:12px">${icon('lightbulb')}Request: Thai Green Curry</div></div>` },
+  { title: 'Pay in two taps', text: 'The Pay page shows what you owe and the bank details, each with its own copy button. Mark it paid when sent.',
+    art: () => `<div class="mini"><div class="row between"><b>You owe</b><b style="font-size:1.4rem;color:var(--brand-text)">&pound;4.72</b></div>
+      <div class="copyrow"><div><div class="muted">Sort code</div><div class="v">00-00-00</div></div><span class="btn small">${icon('copy')}Copy</span></div>
+      <div class="copyrow"><div><div class="muted">Account number</div><div class="v">12345678</div></div><span class="btn small">${icon('copy')}Copy</span></div></div>` },
 ];
+
+const authTop = () => `<div class="ob-top"><span class="brand"><span class="logo">${icon('chef-hat')}</span>Flat Feast</span></div>`;
 
 function viewAuth() {
   if (S.authMode === 'onboard') {
     const s = SLIDES[S.ob];
     const last = S.ob === SLIDES.length - 1;
-    $app.innerHTML = `<div class="wrap">
-      <div class="card pad slide">
-        <div class="num">${s[0]}</div>
-        <h1>${esc(s[1])}</h1>
-        <p class="muted" style="font-size:1rem">${esc(s[2])}</p>
+    $app.innerHTML = `<div class="ob">
+      <div class="ob-top"><span class="brand"><span class="logo">${icon('chef-hat')}</span>Flat Feast</span><button class="linkbtn" data-act="ob-profile">Skip</button></div>
+      <div class="ob-progress" role="progressbar" aria-valuemin="1" aria-valuemax="${SLIDES.length}" aria-valuenow="${S.ob + 1}"><i style="width:${((S.ob + 1) / SLIDES.length) * 100}%"></i></div>
+      <div class="muted ob-step">Step ${S.ob + 1} of ${SLIDES.length}</div>
+      <div class="ob-stage">${s.art()}</div>
+      <h1 class="ob-title">${esc(s.title)}</h1>
+      <p class="ob-text">${esc(s.text)}</p>
+      <div class="ob-actions">
+        ${S.ob > 0 ? `<button class="btn" data-act="ob-back">${icon('arrow-left')}Back</button>` : ''}
+        <button class="btn primary grow" data-act="${last ? 'ob-profile' : 'ob-next'}">${last ? 'Create my profile' : 'Next'}${icon(last ? 'user-plus' : 'arrow-right')}</button>
       </div>
-      <div class="dots">${SLIDES.map((_, i) => `<i class="${i === S.ob ? 'on' : ''}"></i>`).join('')}</div>
-      <div class="row">
-        ${S.ob > 0 ? '<button class="btn" data-act="ob-back">Back</button>' : ''}
-        <button class="btn primary grow" data-act="${last ? 'ob-profile' : 'ob-next'}">${last ? 'Create my profile' : 'Next'}</button>
-      </div>
-      <p class="muted" style="text-align:center;margin-top:18px">
-        <a href="#" data-act="auth-mode" data-m="login">I already have an account</a> &middot;
-        <a href="#" data-act="auth-mode" data-m="cook">Cook login</a>
-      </p></div>`;
+      <p class="muted ob-links"><a href="#" data-act="auth-mode" data-m="login">I already have an account</a> &middot; <a href="#" data-act="auth-mode" data-m="cook">Cook login</a></p></div>`;
     return;
   }
   if (S.authMode === 'profile') {
-    $app.innerHTML = `<div class="wrap"><h1>Create your profile</h1>
+    $app.innerHTML = `<div class="ob">${authTop()}
+      <h1>Create your profile</h1><p class="muted" style="margin-top:0">So your flatmates know who is who.</p>
       <form class="card pad" data-form="register">
-        <div class="imgpick"><span id="p-prev">${avatar({ name: '?' }, 'big')}</span>
-          <div class="grow"><label style="margin-top:0">Profile picture</label><input type="file" id="p-file" accept="image/*"></div></div>
-        <label>Your name</label><input id="p-name" maxlength="30" required autocomplete="nickname">
-        <label>Choose a PIN (4 to 8 digits)</label><input id="p-pin" inputmode="numeric" pattern="\\d{4,8}" maxlength="8" type="password" required autocomplete="new-password">
-        ${S.cfg.needs_code ? '<label>Flat code</label><input id="p-code" required>' : ''}
-        <button class="btn primary block" style="margin-top:16px">Join the flat</button>
+        <label class="avatar-pick" for="p-file"><span id="p-prev" class="avatar-circle">${icon('camera')}</span>Add a profile picture</label>
+        <input type="file" id="p-file" accept="image/*" hidden>
+        <label for="p-name">Your name</label><input id="p-name" maxlength="30" required autocomplete="nickname" placeholder="e.g. Alice">
+        <label for="p-pin">Choose a PIN (4 to 8 digits)</label><input id="p-pin" inputmode="numeric" pattern="\\d{4,8}" maxlength="8" type="password" required autocomplete="new-password" placeholder="You will use this to log back in">
+        ${S.cfg.needs_code ? '<label for="p-code">Flat code</label><input id="p-code" required placeholder="Ask your flat cook">' : ''}
+        <button class="btn primary block" style="margin-top:18px">${icon('check')}Join the flat</button>
       </form>
-      <p class="muted"><a href="#" data-act="auth-mode" data-m="onboard">Back</a></p></div>`;
+      <p class="muted"><a href="#" data-act="auth-mode" data-m="onboard">Back to the intro</a></p></div>`;
     return;
   }
   if (S.authMode === 'login') {
-    $app.innerHTML = `<div class="wrap"><h1>Welcome back</h1>
+    $app.innerHTML = `<div class="ob">${authTop()}<h1>Welcome back</h1>
       <form class="card pad" data-form="login">
-        <label>Name</label><input id="l-name" required autocomplete="username">
-        <label>PIN</label><input id="l-pin" type="password" inputmode="numeric" required autocomplete="current-password">
-        <button class="btn primary block" style="margin-top:16px">Log in</button>
+        <label for="l-name">Name</label><input id="l-name" required autocomplete="username">
+        <label for="l-pin">PIN</label><input id="l-pin" type="password" inputmode="numeric" required autocomplete="current-password">
+        <button class="btn primary block" style="margin-top:18px">${icon('log-in')}Log in</button>
       </form>
-      <p class="muted"><a href="#" data-act="auth-mode" data-m="onboard">Back</a></p></div>`;
+      <p class="muted"><a href="#" data-act="auth-mode" data-m="onboard">Back to the intro</a></p></div>`;
     return;
   }
-  $app.innerHTML = `<div class="wrap"><h1>Cook login</h1>
+  $app.innerHTML = `<div class="ob">${authTop()}<h1>Cook login</h1>
     <form class="card pad" data-form="cook">
-      <label>Admin password</label><input id="c-pass" type="password" required autocomplete="current-password">
-      <button class="btn primary block" style="margin-top:16px">Log in</button>
+      <label for="c-pass">Admin password</label><input id="c-pass" type="password" required autocomplete="current-password">
+      <button class="btn primary block" style="margin-top:18px">${icon('key-round')}Log in</button>
     </form>
-    <p class="muted"><a href="#" data-act="auth-mode" data-m="onboard">Back</a></p></div>`;
+    <p class="muted"><a href="#" data-act="auth-mode" data-m="onboard">Back to the intro</a></p></div>`;
 }
 
 // ---------- meal cards ----------
