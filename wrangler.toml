@@ -4,6 +4,9 @@ name = "menu"
 main = "src/worker.js"
 compatibility_date = "2025-06-01"
 
+# Keep variables and secrets set in the dashboard (such as ADMIN_PASSWORD) when a build redeploys.
+keep_vars = true
+
 [assets]
 directory = "./public"
 binding = "ASSETS"
