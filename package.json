@@ -1,0 +1,13 @@
+{
+  "name": "flat-feast",
+  "private": true,
+  "scripts": {
+    "local": "node local-server.mjs",
+    "local:demo": "node local-server.mjs --demo",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
