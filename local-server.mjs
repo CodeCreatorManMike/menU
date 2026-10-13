@@ -26,9 +26,7 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const local = path.join(root, '.local');
 fs.mkdirSync(path.join(local, 'images'), { recursive: true });
 
-// Load the API module (its filename has brackets, so copy it to a plain name first).
-fs.copyFileSync(path.join(root, 'src/api.js'), path.join(local, 'api.mjs'));
-const { onRequest } = await import(pathToFileURL(path.join(local, 'api.mjs')).href + '?t=' + Date.now());
+const { onRequest } = await import(pathToFileURL(path.join(root, 'src/api.js')).href);
 
 const sqlite = new DatabaseSync(path.join(local, 'flat-feast.db'));
 sqlite.exec(fs.readFileSync(path.join(root, 'schema.sql'), 'utf8'));

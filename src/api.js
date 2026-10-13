@@ -1,5 +1,15 @@
-// Cloudflare Pages Function: handles every /api/* request.
+// API for every /api/* request (used by src/worker.js and local-server.mjs).
 // Bindings: DB (D1), IMAGES (R2). Secrets: ADMIN_PASSWORD, optional JOIN_CODE.
+import { STATEMENTS } from './schema.js';
+
+// Creates the tables and default items the first time the app runs against an empty database.
+let schemaReady = false;
+async function ensureSchema(env) {
+  if (schemaReady) return;
+  const has = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'catalog'").first();
+  if (!has) await env.DB.batch(STATEMENTS.map((s) => env.DB.prepare(s)));
+  schemaReady = true;
+}
 
 const enc = new TextEncoder();
 const json = (d, s = 200, h = {}) =>
@@ -135,6 +145,7 @@ export async function onRequest({ request, env }) {
   const p = url.pathname.replace(/^\/api\/?/, '').split('/').filter(Boolean);
   const method = request.method;
   try {
+    await ensureSchema(env);
     return await route(request, env, url, p, method);
   } catch (e) {
     return fail(e.message || 'Server error', 500);

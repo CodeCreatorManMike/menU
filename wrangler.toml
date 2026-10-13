@@ -1,14 +1,16 @@
+# Deployed with: npx wrangler deploy
+# The Worker name must match the Worker name shown in the Cloudflare dashboard.
 name = "menu"
 main = "src/worker.js"
-compatibility_date = "2024-11-01"
+compatibility_date = "2025-06-01"
 
-# Static front end. The Worker runs first so /api/* reaches the API.
 [assets]
 directory = "./public"
 binding = "ASSETS"
-run_worker_first = true
+# Only /api/* runs the Worker; pages, scripts and styles are served straight from ./public.
+run_worker_first = ["/api/*"]
 
-# No ids needed: wrangler creates the D1 database and R2 bucket on first deploy.
+# No ids on purpose: wrangler creates the database and image bucket on first deploy.
 [[d1_databases]]
 binding = "DB"
 database_name = "flat-feast"

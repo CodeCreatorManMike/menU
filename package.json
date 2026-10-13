@@ -1,13 +1,15 @@
 {
   "name": "flat-feast",
   "private": true,
+  "type": "module",
   "scripts": {
     "local": "node local-server.mjs",
     "local:demo": "node local-server.mjs --demo",
     "dev": "wrangler dev",
+    "gen": "node scripts/gen-schema.mjs",
     "deploy": "wrangler deploy"
   },
   "devDependencies": {
-    "wrangler": "^4.0.0"
+    "wrangler": "^4.50.0"
   }
 }
