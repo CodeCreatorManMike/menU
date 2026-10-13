@@ -403,16 +403,18 @@ function readForm() {
   F.ingredients = [...document.querySelectorAll('.ingrow')].map((r) => ({
     name: r.querySelector('.i-name').value, qty: r.querySelector('.i-qty').value,
     price: r.querySelector('.i-price').value, have: Number(r.dataset.have) || 0,
+    cat: r.dataset.cat || '', auto: r.dataset.auto === '1',
   }));
 }
 function renderForm() {
   const admin = F.mode === 'admin';
   const title = admin ? (F.id ? 'Edit meal' : 'Add a meal') : 'Request a meal';
-  const rows = F.ingredients.map((i, n) => `<div class="ingrow" data-have="${i.have}">
+  const rows = F.ingredients.map((i, n) => `<div class="ingrow" data-have="${i.have}" data-cat="${esc(i.cat || '')}" data-auto="${i.auto ? 1 : 0}">
       <input class="i-name" list="price-bank" placeholder="Ingredient" value="${esc(i.name)}">
       <input class="i-qty" placeholder="Qty" value="${esc(i.qty)}">
       <input class="i-price" inputmode="decimal" placeholder="£" value="${esc(i.price)}">
       <button type="button" class="btn small" data-act="rm-ing" data-n="${n}" aria-label="Remove">${icon('x')}</button>
+      <div class="hint">${esc(hintText(i.cat, i.auto))}</div>
     </div>`).join('');
   shell(`<h1>${title}</h1>
     ${admin && !F.id ? `<a class="btn block" href="#/bank" style="margin-bottom:12px">${icon('library')}Pick from meal bank</a>` : ''}
@@ -422,8 +424,8 @@ function renderForm() {
       <label>Meal name</label><input id="f-title" maxlength="100" required value="${esc(F.title)}">
       <label>Description / notes</label><textarea id="f-desc">${esc(F.description)}</textarea>
       ${admin ? `<label>Date <span class="muted">(optional, leave blank if not decided yet. Everyone sees it once set)</span></label><input id="f-date" type="date" value="${esc(F.date)}">` : ''}
-      <label>Ingredients <span class="muted">(prices are estimates, check Tesco if you like)</span></label>
-      <datalist id="price-bank">${F.bank.map((b) => `<option value="${esc(b.name)}"></option>`).join('')}</datalist>
+      <label>Ingredients <span class="muted">(pick an item for a real Tesco price per pack, then change the quantity)</span></label>
+      <datalist id="price-bank">${F.bank.map((b) => `<option value="${esc(b.name)}" label="${esc(b.pack ? b.pack + ' · ' : '')}£${(b.price_pence / 100).toFixed(2)}${b.unit ? ' per ' + esc(b.unit) : ''}"></option>`).join('')}</datalist>
       ${rows}
       <div class="row wrapflex" style="margin-top:6px"><button type="button" class="btn small" data-act="add-ing">${icon('plus')}Add ingredient</button>
         <a class="btn small" id="tesco-link" target="_blank" rel="noopener" href="https://www.tesco.com/groceries/en-GB/search?query=">${icon('search')}Search Tesco</a></div>
@@ -432,6 +434,21 @@ function renderForm() {
       <button class="btn primary block" style="margin-top:16px">${admin ? 'Save meal' : 'Send request'}</button>
     </form>`, admin ? 'home' : 'requests', 'narrow');
   updateSum();
+}
+
+const bankFind = (name) => (F?.bank || []).find((b) => b.name.toLowerCase() === String(name || '').trim().toLowerCase());
+const qtyNum = (q) => { const m = String(q || '').match(/^\s*(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 1; };
+function hintText(cat, auto) {
+  const b = cat && bankFind(cat);
+  if (!b || b.source !== 'catalog') return '';
+  const one = `${b.product || b.name}: £${(b.price_pence / 100).toFixed(2)} per ${b.unit}`;
+  return auto ? one + ' (price = quantity x this)' : one + ' (price edited by hand)';
+}
+function setHint(row) { const h = row.querySelector('.hint'); if (h) h.textContent = hintText(row.dataset.cat, row.dataset.auto === '1'); }
+function priceFromQty(row) {
+  const b = bankFind(row.dataset.cat);
+  if (!b || b.source !== 'catalog' || row.dataset.auto !== '1') return;
+  row.querySelector('.i-price').value = (Math.round(b.price_pence * qtyNum(row.querySelector('.i-qty').value)) / 100).toFixed(2);
 }
 
 function updateSum() {
@@ -654,19 +671,28 @@ document.addEventListener('change', (e) => {
     const prev = document.getElementById(el.id === 'p-file' ? 'p-prev' : 'm-prev');
     prev.innerHTML = `<img class="av big" src="${URL.createObjectURL(f)}" alt="">`;
   }
-  if (el.classList.contains('i-name')) { // autofill price from previous meals
+  if (el.classList.contains('i-name')) { // autofill qty and price from the catalogue
     const row = el.closest('.ingrow');
-    const hit = (F?.bank || []).find((b) => b.name.toLowerCase() === el.value.trim().toLowerCase());
-    if (hit) {
-      const price = row.querySelector('.i-price'), qty = row.querySelector('.i-qty');
+    const hit = bankFind(el.value);
+    const price = row.querySelector('.i-price'), qty = row.querySelector('.i-qty');
+    if (hit && hit.source === 'catalog') {
+      const manual = price.value && row.dataset.auto !== '1';
+      if (!qty.value || row.dataset.auto === '1') qty.value = hit.qty;
+      row.dataset.cat = hit.name;
+      if (!manual) { row.dataset.auto = '1'; priceFromQty(row); }
+      setHint(row); updateSum();
+    } else if (hit) {
+      row.dataset.cat = ''; row.dataset.auto = '0';
       if (!price.value && hit.price_pence) price.value = (hit.price_pence / 100).toFixed(2);
       if (!qty.value && hit.qty) qty.value = hit.qty;
-      updateSum();
-    }
+      setHint(row); updateSum();
+    } else { row.dataset.cat = ''; row.dataset.auto = '0'; setHint(row); }
   }
 });
 document.addEventListener('input', (e) => {
-  if (e.target.classList.contains('i-price') || e.target.id === 'f-total') updateSum();
+  if (e.target.classList.contains('i-qty')) { const row = e.target.closest('.ingrow'); priceFromQty(row); updateSum(); }
+  if (e.target.classList.contains('i-price')) { const row = e.target.closest('.ingrow'); if (row.dataset.auto === '1') { row.dataset.auto = '0'; setHint(row); } updateSum(); }
+  if (e.target.id === 'f-total') updateSum();
   if (e.target.classList.contains('i-name')) {
     const l = document.getElementById('tesco-link');
     if (l) l.href = 'https://www.tesco.com/groceries/en-GB/search?query=' + encodeURIComponent(e.target.value);

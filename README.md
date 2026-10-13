@@ -49,11 +49,12 @@ menU/
 
 ## How Pricing Works
 
-Tesco and Co-op do not offer a public price API, and scraping their sites is unreliable and against their terms, so prices are estimates:
+Tesco has no public price API, so the catalogue is a snapshot of regular (non-Clubcard) prices read from tesco.com, dated in the header of `data/catalog.tsv`:
 
-- A built-in catalogue of about 90 common UK items ships with typical supermarket prices. These are rough estimates, not live prices. Edit or add rows in the catalogue section of `schema.sql`, then run `npm run gen`.
-- Typing an ingredient name fills in its price and quantity from the catalogue.
-- Every price you enter on a saved meal is remembered and takes priority over the catalogue next time.
+- About 270 items, each priced per real pack or unit ("1 tin" of chopped tomatoes 400g, "1 pack" of chicken breast 650g, "1 bag" of basmati 1kg) rather than per gram or kilo, so the quantity you type multiplies a real shelf price.
+- Typing an ingredient name fills in the quantity as "1 <unit>" and the price. Change the quantity (for example "4 tins") and the price follows. Typing a price by hand stops the automatic maths for that row.
+- Catalogue prices win. Prices remembered from saved meals are only offered for items that are not in the catalogue.
+- To refresh or extend it, edit `data/catalog.tsv` (category, name, unit, pack, price in pounds, Tesco product name; tab separated), then run `npm run gen`. The catalogue reloads into the database automatically on the next request after you deploy, because its version changes.
 - Each ingredient has a "Search Tesco" link that opens a Tesco search so you can check a price.
 - The meal form shows a running total as you type prices. The meal total is the sum of ingredients that are not ticked, and the cook can override it with a fixed total at any time.
 

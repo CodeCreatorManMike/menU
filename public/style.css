@@ -97,6 +97,8 @@ textarea { min-height: 84px; resize: vertical; }
 .covered { margin: 0 0 6px; padding: 8px 10px; background: var(--soft); border-radius: 12px; }
 .payrow { padding: 9px 0; border-top: 1px solid var(--line); }
 .ing.done .nm { text-decoration: line-through; color: var(--muted); }
+.ingrow .hint { grid-column: 1 / -1; font-size: 12px; color: var(--muted, #8a7f76); margin-top: -2px; }
+.ingrow .hint:empty { display: none; }
 .ingrow { display: grid; grid-template-columns: 1fr 72px 80px 40px; gap: 6px; margin-bottom: 6px; align-items: center; }
 .totals { background: var(--soft); border-radius: 16px; padding: 14px; }
 .totals .line { display: flex; justify-content: space-between; padding: 3px 0; gap: 12px; }

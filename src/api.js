@@ -1,6 +1,7 @@
 // API for every /api/* request (used by src/worker.js and local-server.mjs).
 // Bindings: DB (D1, also stores uploaded photos). Secrets: ADMIN_PASSWORD, optional JOIN_CODE.
 import { STATEMENTS } from './schema.js';
+import { CATALOG_VERSION, CATALOG_CREATE, CATALOG_STATEMENTS } from './catalog.js';
 
 // Creates the tables and default items the first time the app runs against an empty database.
 let schemaReady = false;
@@ -15,6 +16,16 @@ async function ensureSchema(env) {
       try { await env.DB.prepare('ALTER TABLE ingredients ADD COLUMN have_by TEXT').run(); }
       catch (e) { if (!/duplicate column/i.test(String(e.message || e))) throw e; }
     }
+  }
+  // The Tesco catalogue is reloaded whenever data/catalog.tsv changes (its version changes).
+  await env.DB.prepare(CATALOG_CREATE).run();
+  const cv = await env.DB.prepare("SELECT value FROM settings WHERE key = 'catalog_version'").first();
+  if (!cv || cv.value !== CATALOG_VERSION) {
+    await env.DB.batch([
+      env.DB.prepare('DELETE FROM products'),
+      ...CATALOG_STATEMENTS.map((x) => env.DB.prepare(x)),
+      env.DB.prepare("INSERT INTO settings (key, value) VALUES ('catalog_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(CATALOG_VERSION),
+    ]);
   }
   schemaReady = true;
 }
@@ -302,15 +313,16 @@ async function route(request, env, url, p, method) {
   }
 
   if (p[0] === 'price-bank' && method === 'GET') {
-    // Default catalogue first, then prices from meals you have saved (those win).
-    const merged = new Map();
-    const base = (await env.DB.prepare('SELECT name, qty, price_pence FROM catalog').all()).results;
-    for (const r of base) merged.set(r.name.toLowerCase(), r);
+    // Tesco catalogue first (priced per pack/unit). Prices remembered from saved meals
+    // are only offered for names the catalogue does not cover.
+    const base = (await env.DB.prepare('SELECT name, category, unit, pack, price_pence, product FROM products ORDER BY name COLLATE NOCASE').all()).results;
+    const items = base.map((r) => ({ name: r.name, qty: '1 ' + r.unit, unit: r.unit, pack: r.pack, category: r.category, product: r.product, price_pence: r.price_pence, source: 'catalog' }));
+    const have = new Set(items.map((i) => i.name.toLowerCase()));
     const used = (await env.DB.prepare(
       'SELECT name, price_pence, qty FROM ingredients WHERE id IN (SELECT MAX(id) FROM ingredients WHERE price_pence > 0 GROUP BY lower(name))'
     ).all()).results;
-    for (const r of used) merged.set(r.name.toLowerCase(), r);
-    const items = [...merged.values()].sort((a, b) => a.name.localeCompare(b.name));
+    for (const r of used) if (!have.has(r.name.toLowerCase())) items.push({ name: r.name, qty: r.qty, price_pence: r.price_pence, source: 'saved' });
+    items.sort((x, y) => x.name.localeCompare(y.name));
     return json({ items });
   }
 
