@@ -76,16 +76,16 @@ if (process.argv.includes('--demo') && !sqlite.prepare('SELECT 1 FROM meals LIMI
     const r = sqlite.prepare('INSERT INTO meals (title, description, date, status, cook_id, requested_by) VALUES (?,?,?,?,?,?)')
       .run(title, desc, date, status, status === 'scheduled' ? cook : null, by);
     const id = Number(r.lastInsertRowid);
-    ings.forEach(([name, qty, p, have], i) => sqlite.prepare('INSERT INTO ingredients (meal_id,name,qty,price_pence,have,sort) VALUES (?,?,?,?,?,?)').run(id, name, qty, p, have || 0, i));
+    ings.forEach(([name, qty, p, by], i) => sqlite.prepare('INSERT INTO ingredients (meal_id,name,qty,price_pence,have,have_by,sort) VALUES (?,?,?,?,?,?,?)').run(id, name, qty, p, by ? 1 : 0, by || null, i));
     return id;
   };
   const rsvp = (m, u, s) => sqlite.prepare('INSERT INTO rsvps (meal_id,user_id,status) VALUES (?,?,?)').run(m, u, s);
   const past = addMeal('Chicken Tikka Masala', 'Big batch with rice and naan.', day(-2), [['Chicken thighs', '2kg', 900], ['Tikka paste', '2 jars', 300], ['Basmati rice', '1kg', 250], ['Naan', '8', 200]]);
   [0, 1, 2].forEach((i) => rsvp(past, people[i], 'in')); rsvp(past, people[3], 'out');
   sqlite.prepare("INSERT INTO payments (meal_id,user_id,status) VALUES (?,?,'claimed')").run(past, people[0]);
-  const t1 = addMeal('Beef Chilli', 'Slow cooked, with rice and nachos.', day(0), [['Beef mince', '1kg', 650], ['Kidney beans', '3 tins', 210], ['Chopped tomatoes', '4 tins', 280], ['Rice', '1kg', 200, 1], ['Tortilla chips', '2 bags', 300]]);
+  const t1 = addMeal('Beef Chilli', 'Slow cooked, with rice and nachos.', day(0), [['Beef mince', '1kg', 650], ['Kidney beans', '3 tins', 210], ['Chopped tomatoes', '4 tins', 280], ['Rice', '1kg', 200, people[1]], ['Tortilla chips', '2 bags', 300, people[0]]]);
   [0, 1].forEach((i) => rsvp(t1, people[i], 'in')); rsvp(t1, people[2], 'out');
-  const t2 = addMeal('Spaghetti Bolognese', 'Classic, with garlic bread.', day(2), [['Spaghetti', '1kg', 160], ['Beef mince', '1kg', 650], ['Passata', '2 jars', 240], ['Garlic bread', '3', 270]]);
+  const t2 = addMeal('Spaghetti Bolognese', 'Classic, with garlic bread.', day(2), [['Spaghetti', '1kg', 160, people[0]], ['Beef mince', '1kg', 650], ['Passata', '2 jars', 240], ['Garlic bread', '3', 270]]);
   rsvp(t2, people[1], 'in');
   addMeal('Veggie Lasagne', 'Layered with spinach and ricotta.', day(5), [['Lasagne sheets', '1 box', 180], ['Spinach', '500g', 200], ['Ricotta', '2 tubs', 300], ['Cheddar', '400g', 380]]);
   addMeal('Thai Green Curry', 'Please! With extra veg.', null, [['Green curry paste', '2', 240], ['Coconut milk', '4 tins', 400]], 'requested', people[2]);
@@ -121,6 +121,6 @@ http.createServer(async (req, res) => {
     res.writeHead(500); res.end(String(e.message || e));
   }
 }).listen(PORT, () => {
-  console.log(`Flat Feast running at http://localhost:${PORT}`);
+  console.log(`menU running at http://localhost:${PORT}`);
   console.log(`Cook password: ${env.ADMIN_PASSWORD}`);
 });

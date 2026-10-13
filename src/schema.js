@@ -4,7 +4,7 @@ export const STATEMENTS = [
   "CREATE TABLE IF NOT EXISTS sessions ( id TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires_at INTEGER NOT NULL )",
   "CREATE TABLE IF NOT EXISTS meals ( id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', image_key TEXT, date TEXT, status TEXT NOT NULL DEFAULT 'scheduled', cook_id TEXT, requested_by TEXT, total_override_pence INTEGER, created_at TEXT NOT NULL DEFAULT (datetime('now')) )",
   "CREATE INDEX IF NOT EXISTS idx_meals_date ON meals(date)",
-  "CREATE TABLE IF NOT EXISTS ingredients ( id INTEGER PRIMARY KEY AUTOINCREMENT, meal_id INTEGER NOT NULL, name TEXT NOT NULL, qty TEXT NOT NULL DEFAULT '', price_pence INTEGER NOT NULL DEFAULT 0, have INTEGER NOT NULL DEFAULT 0, sort INTEGER NOT NULL DEFAULT 0 )",
+  "CREATE TABLE IF NOT EXISTS ingredients ( id INTEGER PRIMARY KEY AUTOINCREMENT, meal_id INTEGER NOT NULL, name TEXT NOT NULL, qty TEXT NOT NULL DEFAULT '', price_pence INTEGER NOT NULL DEFAULT 0, have INTEGER NOT NULL DEFAULT 0, have_by TEXT, sort INTEGER NOT NULL DEFAULT 0 )",
   "CREATE INDEX IF NOT EXISTS idx_ing_meal ON ingredients(meal_id)",
   "CREATE TABLE IF NOT EXISTS rsvps ( meal_id INTEGER NOT NULL, user_id TEXT NOT NULL, status TEXT NOT NULL, PRIMARY KEY (meal_id, user_id) )",
   "CREATE TABLE IF NOT EXISTS payments ( meal_id INTEGER NOT NULL, user_id TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'unpaid', updated_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (meal_id, user_id) )",

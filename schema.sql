@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS ingredients (
   qty TEXT NOT NULL DEFAULT '',
   price_pence INTEGER NOT NULL DEFAULT 0,
   have INTEGER NOT NULL DEFAULT 0,
+  have_by TEXT, -- user who ticked it
   sort INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_ing_meal ON ingredients(meal_id);

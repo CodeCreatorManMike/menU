@@ -1,0 +1,14 @@
+{
+  "name": "menU",
+  "short_name": "menU",
+  "description": "Cook once, share the table. Meal planning and cost splitting for a shared flat.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fbf6ef",
+  "theme_color": "#f5974a",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

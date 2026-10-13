@@ -8,6 +8,14 @@ async function ensureSchema(env) {
   if (schemaReady) return;
   const has = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'images'").first();
   if (!has) await env.DB.batch(STATEMENTS.map((s) => env.DB.prepare(s)));
+  else {
+    // Databases created before ingredients remembered who ticked them get the new column.
+    const cols = (await env.DB.prepare('PRAGMA table_info(ingredients)').all()).results;
+    if (!cols.some((c) => c.name === 'have_by')) {
+      try { await env.DB.prepare('ALTER TABLE ingredients ADD COLUMN have_by TEXT').run(); }
+      catch (e) { if (!/duplicate column/i.test(String(e.message || e))) throw e; }
+    }
+  }
   schemaReady = true;
 }
 
@@ -136,12 +144,19 @@ function cleanIngredients(list) {
     .slice(0, 60);
 }
 
-function ingredientStatements(env, mealId, list) {
+// Rewrites a meal's ingredients. Ticked items keep whoever ticked them (matched by name);
+// items ticked for the first time in the editor are credited to the person saving.
+async function ingredientStatements(env, mealId, list, userId) {
+  const prev = {};
+  for (const r of (await env.DB.prepare('SELECT name, have, have_by FROM ingredients WHERE meal_id = ?').bind(mealId).all()).results) {
+    if (r.have && r.have_by) prev[r.name.toLowerCase()] = r.have_by;
+  }
   const stmts = [env.DB.prepare('DELETE FROM ingredients WHERE meal_id = ?').bind(mealId)];
   for (const i of list) {
+    const by = i.have ? prev[i.name.toLowerCase()] || userId : null;
     stmts.push(
-      env.DB.prepare('INSERT INTO ingredients (meal_id, name, qty, price_pence, have, sort) VALUES (?, ?, ?, ?, ?, ?)')
-        .bind(mealId, i.name, i.qty, i.price_pence, i.have, i.sort)
+      env.DB.prepare('INSERT INTO ingredients (meal_id, name, qty, price_pence, have, have_by, sort) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .bind(mealId, i.name, i.qty, i.price_pence, i.have, by, i.sort)
     );
   }
   return stmts;
@@ -345,7 +360,7 @@ async function route(request, env, url, p, method) {
       "INSERT INTO meals (title, description, image_key, date, status, cook_id, total_override_pence) VALUES (?, ?, ?, ?, 'scheduled', ?, ?)"
     ).bind(title, String(b.description || '').slice(0, 2000), b.image_key || null, b.date || null, user.id, override).run();
     const id = res.meta.last_row_id;
-    await env.DB.batch(ingredientStatements(env, id, cleanIngredients(b.ingredients)));
+    await env.DB.batch(await ingredientStatements(env, id, cleanIngredients(b.ingredients), user.id));
     return json({ id });
   }
 
@@ -353,7 +368,10 @@ async function route(request, env, url, p, method) {
     const id = Number(p[1]);
     const meal = await env.DB.prepare(`SELECT ${MEAL_COLS} ${MEAL_JOIN} WHERE m.id = ?`).bind(id).first();
     if (!meal) return fail('Meal not found', 404);
-    const ingredients = (await env.DB.prepare('SELECT * FROM ingredients WHERE meal_id = ? ORDER BY sort, id').bind(id).all()).results;
+    const ingredients = (await env.DB.prepare(
+      `SELECT i.*, u.name AS have_name, u.avatar_key AS have_avatar FROM ingredients i LEFT JOIN users u ON u.id = i.have_by
+       WHERE i.meal_id = ? ORDER BY i.sort, i.id`
+    ).bind(id).all()).results;
     const [s] = await summarise(env, [meal], user.id);
     return json({ meal: s, ingredients, today: today() });
   }
@@ -369,7 +387,7 @@ async function route(request, env, url, p, method) {
       ? null : Math.max(0, Math.round(Number(b.total_override_pence)));
     await env.DB.prepare('UPDATE meals SET title = ?, description = ?, image_key = ?, date = ?, total_override_pence = ? WHERE id = ?')
       .bind(title, String(b.description || '').slice(0, 2000), b.image_key || null, b.date || null, override, id).run();
-    if (Array.isArray(b.ingredients)) await env.DB.batch(ingredientStatements(env, id, cleanIngredients(b.ingredients)));
+    if (Array.isArray(b.ingredients)) await env.DB.batch(await ingredientStatements(env, id, cleanIngredients(b.ingredients), user.id));
     return json({ ok: true });
   }
 
@@ -431,7 +449,16 @@ async function route(request, env, url, p, method) {
 
   if (p[0] === 'ingredients' && p[1] && p[2] === 'have' && method === 'POST') {
     const b = await body();
-    await env.DB.prepare('UPDATE ingredients SET have = ? WHERE id = ?').bind(b.have ? 1 : 0, Number(p[1])).run();
+    const id = Number(p[1]);
+    const ing = await env.DB.prepare('SELECT i.have, i.have_by, u.name AS by_name FROM ingredients i LEFT JOIN users u ON u.id = i.have_by WHERE i.id = ?').bind(id).first();
+    if (!ing) return fail('Ingredient not found', 404);
+    if (b.have) {
+      if (ing.have && ing.have_by && ing.have_by !== user.id) return fail(`${ing.by_name || 'Someone'} already has this`, 409);
+      await env.DB.prepare('UPDATE ingredients SET have = 1, have_by = ? WHERE id = ?').bind(user.id, id).run();
+    } else {
+      if (ing.have && ing.have_by && ing.have_by !== user.id && !admin) return fail(`Only ${ing.by_name || 'the person who ticked it'} or the cook can untick this`, 403);
+      await env.DB.prepare('UPDATE ingredients SET have = 0, have_by = NULL WHERE id = ?').bind(id).run();
+    }
     return json({ ok: true });
   }
 
@@ -450,7 +477,7 @@ async function route(request, env, url, p, method) {
     const res = await env.DB.prepare(
       "INSERT INTO meals (title, description, image_key, status, requested_by) VALUES (?, ?, ?, 'requested', ?)"
     ).bind(title, String(b.description || '').slice(0, 2000), b.image_key || null, user.id).run();
-    await env.DB.batch(ingredientStatements(env, res.meta.last_row_id, cleanIngredients(b.ingredients)));
+    await env.DB.batch(await ingredientStatements(env, res.meta.last_row_id, cleanIngredients(b.ingredients), user.id));
     return json({ id: res.meta.last_row_id });
   }
 

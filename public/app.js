@@ -1,6 +1,6 @@
-/* Flat Feast front end: vanilla JS single page app, hash routing. */
+/* menU front end: vanilla JS single page app, hash routing. */
 const $app = document.getElementById('app');
-const S = { me: null, cfg: {}, ob: 0, authMode: 'onboard', settings: null };
+const S = { me: null, cfg: {}, ob: 0, authMode: 'onboard', settings: null, quiet: false };
 
 // ---------- helpers ----------
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -89,22 +89,35 @@ function fallbackCopy(v, done) {
 }
 
 // ---------- shell ----------
-function shell(inner, active) {
+// cls sets the page width: '' (wide), 'mid' or 'narrow'. Phones always use the full width.
+function shell(inner, active, cls = '') {
+  document.body.classList.add('has-nav');
   const a = isAdmin();
-  const tab = (href, ic, label, key) => `<a href="${href}" class="${active === key ? 'on' : ''}"><b>${icon(ic)}</b>${label}</a>`;
+  const tab = (href, ic, label, key) => `<a href="${href}" class="${active === key ? 'on' : ''}"${active === key ? ' aria-current="page"' : ''}><b>${icon(ic)}</b><span>${label}</span></a>`;
   $app.innerHTML = `
     <div class="top">
-      <a class="brand" href="#/"><span class="logo">${icon('chef-hat')}</span>Flat Feast</a>
+      <a class="brand" href="#/"><span class="logo">${icon('chef-hat')}</span>menU</a>
       <a href="#/me" aria-label="Profile">${avatar(S.me)}</a>
     </div>
-    <div class="wrap">${inner}</div>
-    <nav class="nav"><div class="in">
+    <main class="wrap ${cls}">${inner}</main>
+    <nav class="nav" aria-label="Main"><div class="in">
+      <a class="brand nav-brand" href="#/"><span class="logo">${icon('chef-hat')}</span>menU</a>
       ${tab('#/', 'house', 'Home', 'home')}
       ${tab('#/calendar', 'calendar-days', 'Calendar', 'calendar')}
       ${tab('#/requests', 'lightbulb', 'Requests', 'requests')}
       ${a ? tab('#/bank', 'library', 'Meal bank', 'bank') : ''}
       ${tab('#/pay', 'pound-sterling', a ? 'Owed' : 'Pay', 'pay')}
+      <a class="nav-me ${active === 'me' ? 'on' : ''}" href="#/me">${avatar(S.me, 'sm')}<span>${esc(S.me.name)}</span></a>
     </div></nav>`;
+}
+// Placeholder while a page loads. Skipped on quiet refreshes so the page does not jump to the top.
+function loading(active, cls = '') { if (!S.quiet) shell('<p class="muted">Loading...</p>', active, cls); }
+// Re-draws the current page in place and keeps the scroll position (used after ticking, joining, paying).
+async function refresh() {
+  const y = window.scrollY;
+  S.quiet = true;
+  try { await render(); } finally { S.quiet = false; }
+  window.scrollTo(0, y);
 }
 
 // ---------- auth + onboarding ----------
@@ -117,9 +130,9 @@ const SLIDES = [
     art: () => `<div class="mini"><div class="mini-hero">${icon('utensils')}</div>
       <div class="row between" style="margin-top:10px"><b>Beef Chilli</b><span class="badge">Today</span></div>
       <div class="row between" style="margin-top:6px"><span class="muted">&pound;5.76 each</span><span class="stack">${mav('A')}${mav('B')}${mav('C')}</span></div></div>` },
-  { title: "Say if you're in", text: 'Tap I\'m in or Count me out on any meal. Your share updates as people join. No reply means you are not counted.',
+  { title: "Say if you're in", text: 'Tap I\'m in or I\'m out on any meal. Your share updates as people join. No reply means you are not counted.',
     art: () => `<div class="mini"><div class="row between"><b>Beef Chilli</b><span class="muted">3 in, 1 out</span></div>
-      <div class="seg" style="margin-top:12px"><span class="btn in">${icon('check')}I'm in</span><span class="btn">${icon('x')}Count me out</span></div>
+      <div class="seg" style="margin-top:12px"><span class="btn in">${icon('check')}I'm in</span><span class="btn">${icon('x')}I'm out</span></div>
       <div class="row" style="margin-top:12px"><span class="stack">${mav('A')}${mav('B')}${mav('C')}</span><span class="muted">your share &pound;5.76</span></div></div>` },
   { title: 'Tick off what you have', text: 'Already got rice in the cupboard? Tick it. The meal price only counts what is still needed.',
     art: () => `<div class="mini">
@@ -137,24 +150,25 @@ const SLIDES = [
       <div class="copyrow"><div><div class="muted">Account number</div><div class="v">12345678</div></div><span class="btn small">${icon('copy')}Copy</span></div></div>` },
 ];
 
-const authTop = () => `<div class="ob-top"><span class="brand"><span class="logo">${icon('chef-hat')}</span>Flat Feast</span></div>`;
+const authTop = () => `<div class="ob-top"><span class="brand"><span class="logo">${icon('chef-hat')}</span>menU</span></div>`;
 
 function viewAuth() {
+  document.body.classList.remove('has-nav');
   if (S.authMode === 'onboard') {
     const s = SLIDES[S.ob];
     const last = S.ob === SLIDES.length - 1;
-    $app.innerHTML = `<div class="ob">
-      <div class="ob-top"><span class="brand"><span class="logo">${icon('chef-hat')}</span>Flat Feast</span><button class="linkbtn" data-act="ob-profile">Skip</button></div>
+    $app.innerHTML = `<div class="ob wide">
+      <div class="ob-top"><span class="brand"><span class="logo">${icon('chef-hat')}</span>menU</span><button class="linkbtn" data-act="ob-profile">Skip</button></div>
       <div class="ob-progress" role="progressbar" aria-valuemin="1" aria-valuemax="${SLIDES.length}" aria-valuenow="${S.ob + 1}"><i style="width:${((S.ob + 1) / SLIDES.length) * 100}%"></i></div>
       <div class="muted ob-step">Step ${S.ob + 1} of ${SLIDES.length}</div>
-      <div class="ob-stage">${s.art()}</div>
-      <h1 class="ob-title">${esc(s.title)}</h1>
+      <div class="ob-body"><div class="ob-stage">${s.art()}</div>
+      <div class="ob-copy"><h1 class="ob-title">${esc(s.title)}</h1>
       <p class="ob-text">${esc(s.text)}</p>
       <div class="ob-actions">
         ${S.ob > 0 ? `<button class="btn" data-act="ob-back">${icon('arrow-left')}Back</button>` : ''}
         <button class="btn primary grow" data-act="${last ? 'ob-profile' : 'ob-next'}">${last ? 'Create my profile' : 'Next'}${icon(last ? 'user-plus' : 'arrow-right')}</button>
       </div>
-      <p class="muted ob-links"><a href="#" data-act="auth-mode" data-m="login">I already have an account</a> &middot; <a href="#" data-act="auth-mode" data-m="cook">Cook login</a></p></div>`;
+      <p class="muted ob-links"><a href="#" data-act="auth-mode" data-m="login">I already have an account</a> &middot; <a href="#" data-act="auth-mode" data-m="cook">Cook login</a></p></div></div></div>`;
     return;
   }
   if (S.authMode === 'profile') {
@@ -193,14 +207,14 @@ function viewAuth() {
 function shareLine(m) {
   const sp = m.split;
   if (m.my_rsvp === 'in' && !isAdmin()) return `<b>Your share ${money(sp.per)}</b>`;
-  if (isAdmin()) return `<b>You pay ${money(sp.cook)}</b> <span class="muted">(${sp.diners} others at ${money(sp.per)})</span>`;
+  if (isAdmin()) return `<b>You pay ${money(sp.cook)}</b> <span class="muted">(${sp.diners} ${sp.diners === 1 ? 'other' : 'others'} at ${money(sp.per)})</span>`;
   return `<span class="muted">${sp.diners ? money(sp.per) + ' each if you join' : 'Be the first to join'}</span>`;
 }
 function rsvpButtons(m) {
   if (isAdmin()) return '';
   return `<div class="seg" style="margin-top:10px">
     <button class="btn ${m.my_rsvp === 'in' ? 'in' : ''}" data-act="rsvp" data-id="${m.id}" data-s="in">${icon('check')}I'm in</button>
-    <button class="btn ${m.my_rsvp === 'out' ? 'out' : ''}" data-act="rsvp" data-id="${m.id}" data-s="out">${icon('x')}Count me out</button>
+    <button class="btn ${m.my_rsvp === 'out' ? 'out' : ''}" data-act="rsvp" data-id="${m.id}" data-s="out">${icon('x')}I'm out</button>
   </div>`;
 }
 function mealCard(m, today) {
@@ -220,24 +234,24 @@ function mealCard(m, today) {
 
 // ---------- views ----------
 async function viewHome() {
-  shell('<p class="muted">Loading...</p>', 'home');
+  loading('home');
   const { meals, today, undated } = await api('/meals?scope=upcoming');
   const tod = meals.filter((m) => m.date === today);
   const later = meals.filter((m) => m.date > today);
   shell(`
-    ${isAdmin() ? `<a class="btn primary block" href="#/new" style="margin-bottom:14px">${icon('plus')}Add a meal</a>` : ''}
+    ${isAdmin() ? `<a class="btn primary block addbtn" href="#/new">${icon('plus')}Add a meal</a>` : ''}
     <div class="sectionhead"><h2>Today</h2></div>
-    ${tod.length ? tod.map((m) => mealCard(m, today)).join('') : '<div class="card pad muted">No meal planned for today.</div>'}
+    <div class="grid">${tod.length ? tod.map((m) => mealCard(m, today)).join('') : '<div class="card pad muted empty">No meal planned for today.</div>'}</div>
     <div class="sectionhead"><h2>Coming up</h2></div>
-    ${later.length ? later.map((m) => mealCard(m, today)).join('') : '<div class="card pad muted">Nothing scheduled yet. Request a meal you fancy from the Requests tab.</div>'}
-    ${undated && undated.length ? `<div class="sectionhead"><h2>Date to be decided</h2></div>${undated.map((m) => mealCard(m, today)).join('')}` : ''}
+    <div class="grid">${later.length ? later.map((m) => mealCard(m, today)).join('') : '<div class="card pad muted empty">Nothing scheduled yet. Request a meal you fancy from the Requests tab.</div>'}</div>
+    ${undated && undated.length ? `<div class="sectionhead"><h2>Date to be decided</h2></div><div class="grid">${undated.map((m) => mealCard(m, today)).join('')}</div>` : ''}
   `, 'home');
 }
 
 async function viewCalendar(params) {
   const t = todayStr();
   const month = params.get('m') || t.slice(0, 7);
-  shell('<p class="muted">Loading...</p>', 'calendar');
+  loading('calendar', 'mid');
   const { meals } = await api('/meals?scope=month&month=' + month);
   const [y, mo] = month.split('-').map(Number);
   const first = new Date(Date.UTC(y, mo - 1, 1));
@@ -259,28 +273,50 @@ async function viewCalendar(params) {
     </div>
     <div class="cal">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => `<div class="dow">${d}</div>`).join('')}${cells}</div>
     ${isAdmin() ? '<p class="muted" style="margin-top:12px">Tap an empty day to add a meal on that date.</p>' : ''}
-  `, 'calendar');
+  `, 'calendar', 'mid');
 }
 
 async function viewDay(date) {
-  shell('<p class="muted">Loading...</p>', 'calendar');
+  loading('calendar');
   const { meals, today } = await api('/meals?scope=month&month=' + date.slice(0, 7));
   const list = meals.filter((m) => m.date === date);
-  shell(`<h2>${fmtDate(date)}</h2>${list.map((m) => mealCard(m, today)).join('')}`, 'calendar');
+  shell(`<h2>${fmtDate(date)}</h2><div class="grid">${list.map((m) => mealCard(m, today)).join('')}</div>`, 'calendar');
 }
 
 async function viewMeal(id) {
-  shell('<p class="muted">Loading...</p>', 'home');
+  loading('home');
   const { meal: m, ingredients, today } = await api('/meals/' + id);
   const a = isAdmin();
   const sp = m.split;
   const past = m.date && m.date <= today;
-  const ings = ingredients.map((i) => `<div class="ing ${i.have ? 'done' : ''}">
+  const meId = S.me.id;
+  // Who has ticked what: each ticked ingredient shows its provider's profile picture and name.
+  const provider = (i) => (i.have && i.have_by ? { id: i.have_by, name: i.have_name || 'Someone', avatar_key: i.have_avatar } : null);
+  const ings = ingredients.map((i) => {
+    const p = provider(i);
+    return `<label class="ing ${i.have ? 'done' : ''}">
       <input type="checkbox" ${i.have ? 'checked' : ''} data-act="have" data-id="${i.id}" aria-label="Have ${esc(i.name)}">
-      <div class="grow nm">${esc(i.name)}${i.qty ? ` <span class="muted">${esc(i.qty)}</span>` : ''}</div>
+      <span class="grow"><span class="nm">${esc(i.name)}${i.qty ? ` <span class="muted">${esc(i.qty)}</span>` : ''}</span>
+        ${p ? `<span class="prov">${avatar(p, 'xs')}<span>${p.id === meId ? 'You have this' : esc(p.name) + ' has this'}</span></span>` : ''}</span>
       <span class="${i.have ? 'muted' : ''}">${i.price_pence ? money(i.price_pence) : ''}</span>
-    </div>`).join('');
-  const notIn = (u) => !m.ins.find((x) => x.user_id === u) && !m.outs.find((x) => x.user_id === u);
+    </label>`;
+  }).join('');
+  const givers = [];
+  for (const i of ingredients) {
+    const p = provider(i);
+    if (!p) continue;
+    let g = givers.find((x) => x.id === p.id);
+    if (!g) givers.push((g = { ...p, n: 0 }));
+    g.n++;
+  }
+  givers.sort((x, y) => (y.id === meId) - (x.id === meId));
+  const giverNames = (list) => list.length <= 2 ? list.map((g) => (g.id === meId ? 'You' : esc(g.name))).join(' and ')
+    : `${list.length} people`;
+  const items = givers.reduce((x, g) => x + g.n, 0);
+  const verb = givers.length === 1 && givers[0].id !== meId ? 'is' : 'are';
+  const covered = givers.length
+    ? `<div class="row covered">${stackAv(givers)}<span class="muted">${giverNames(givers)} ${verb} covering ${items} ${items === 1 ? 'item' : 'items'}</span></div>`
+    : '';
   let payBlock = '';
   if (a && past) {
     const rows = m.ins.filter((u) => u.user_id !== m.cook_id).map((u) => {
@@ -289,15 +325,17 @@ async function viewMeal(id) {
       const btn = st === 'confirmed'
         ? `<button class="btn small" data-act="pay" data-id="${m.id}" data-u="${u.user_id}" data-s="unpaid">Undo</button>`
         : `<button class="btn small primary" data-act="pay" data-id="${m.id}" data-u="${u.user_id}" data-s="confirmed">Confirm paid</button>`;
-      return `<div class="row" style="padding:8px 0;border-top:1px solid var(--line)">${avatar(u, 'sm')}<span class="grow">${esc(u.name)} <span class="muted">${money(sp.per)}</span></span>${badge}${btn}</div>`;
+      return `<div class="row wrapflex payrow">${avatar(u, 'sm')}<span class="grow">${esc(u.name)} <span class="muted">${money(sp.per)}</span></span>${badge}${btn}</div>`;
     }).join('');
     payBlock = `<div class="card pad"><h2>Payments</h2>${rows || '<p class="muted">Nobody opted in.</p>'}</div>`;
   }
   shell(`
+    <div class="meal-cols">
+    <div class="col">
     <div class="card">
-      ${m.image_key ? `<img class="hero" src="${imgUrl(m.image_key)}" alt="">` : ''}
+      ${m.image_key ? `<img class="hero lg" src="${imgUrl(m.image_key)}" alt="">` : ''}
       <div class="pad">
-        <div class="row between"><span class="muted">${m.date ? fmtDate(m.date) : m.status === 'requested' ? 'Requested' : 'Date to be decided'}${m.date === today ? ' (today)' : ''}</span>
+        <div class="row between wrapflex"><span class="muted">${m.date ? fmtDate(m.date) : m.status === 'requested' ? 'Requested' : 'Date to be decided'}${m.date === today ? ' (today)' : ''}</span>
           ${m.cook_name ? `<span class="row" style="gap:6px">${avatar({ name: m.cook_name, avatar_key: m.cook_avatar }, 'sm')}<span class="muted">${esc(m.cook_name)}</span></span>` : ''}</div>
         <h1 style="margin-top:6px">${esc(m.title)}</h1>
         ${m.description ? `<p style="white-space:pre-wrap">${esc(m.description)}</p>` : ''}
@@ -314,9 +352,12 @@ async function viewMeal(id) {
         <input id="t-total" inputmode="decimal" placeholder="Set total £ (blank = auto)" value="${sp.auto ? '' : (sp.total / 100).toFixed(2)}">
         <button class="btn small primary">Save</button></form>` : ''}
     </div>` : ''}
+    </div>
+    <div class="col">
     <div class="card pad">
       <div class="row between"><h2 style="margin:0">Ingredients</h2><span class="muted">${m.ing_missing} still needed</span></div>
-      <p class="muted" style="margin:4px 0 8px">Tick what we already have.</p>
+      <p class="muted" style="margin:4px 0 8px">Tick what you already have and your profile shows next to it.</p>
+      ${covered}
       ${ings || '<p class="muted">No ingredients listed.</p>'}
     </div>
     ${m.status === 'scheduled' ? `<div class="card pad">
@@ -330,6 +371,8 @@ async function viewMeal(id) {
       <a class="btn" href="#/edit/${m.id}">${icon('pencil')}Edit</a>
       <a class="btn" href="#/new?from=${m.id}">${icon('repeat')}Cook again</a>
       <button class="btn danger" data-act="del-meal" data-id="${m.id}">${icon('trash-2')}Delete</button></div>` : ''}
+    </div>
+    </div>
   `, 'home');
 }
 
@@ -372,7 +415,7 @@ function renderForm() {
   shell(`<h1>${title}</h1>
     ${admin && !F.id ? `<a class="btn block" href="#/bank" style="margin-bottom:12px">${icon('library')}Pick from meal bank</a>` : ''}
     <form class="card pad" data-form="meal">
-      <div class="imgpick"><span id="f-prev">${F.image_key ? `<img src="${imgUrl(F.image_key)}" alt="">` : '<img alt="" style="visibility:hidden">'}</span>
+      <div class="imgpick"><span id="f-prev">${F.image_key ? `<img src="${imgUrl(F.image_key)}" alt="">` : `<span class="imgph">${icon('camera')}</span>`}</span>
         <div class="grow"><label style="margin-top:0">Photo of the meal</label><input type="file" id="f-file" accept="image/*"></div></div>
       <label>Meal name</label><input id="f-title" maxlength="100" required value="${esc(F.title)}">
       <label>Description / notes</label><textarea id="f-desc">${esc(F.description)}</textarea>
@@ -380,12 +423,12 @@ function renderForm() {
       <label>Ingredients <span class="muted">(prices are estimates, check Tesco if you like)</span></label>
       <datalist id="price-bank">${F.bank.map((b) => `<option value="${esc(b.name)}"></option>`).join('')}</datalist>
       ${rows}
-      <div class="row" style="margin-top:6px"><button type="button" class="btn small" data-act="add-ing">${icon('plus')}Add ingredient</button>
+      <div class="row wrapflex" style="margin-top:6px"><button type="button" class="btn small" data-act="add-ing">${icon('plus')}Add ingredient</button>
         <a class="btn small" id="tesco-link" target="_blank" rel="noopener" href="https://www.tesco.com/groceries/en-GB/search?query=">${icon('search')}Search Tesco</a></div>
       <div class="totals" id="f-sum" style="margin-top:12px"></div>
       ${admin ? `<label>Total price to split £ <span class="muted">(leave blank to use the ingredient total)</span></label><input id="f-total" inputmode="decimal" value="${esc(F.total)}">` : ''}
       <button class="btn primary block" style="margin-top:16px">${admin ? 'Save meal' : 'Send request'}</button>
-    </form>`, admin ? 'home' : 'requests');
+    </form>`, admin ? 'home' : 'requests', 'narrow');
   updateSum();
 }
 
@@ -434,18 +477,18 @@ async function submitForm() {
 }
 
 async function viewBank() {
-  shell('<p class="muted">Loading...</p>', 'bank');
+  loading('bank', 'narrow');
   const { meals } = await api('/meals?scope=bank');
   shell(`<h1>Meal bank</h1><p class="muted">Everything you have cooked before. Tap one to schedule it again.</p>
     ${meals.map((m) => `<a class="card row" style="text-decoration:none;color:inherit;padding:10px" href="#/new?from=${m.id}">
       ${m.image_key ? `<img class="av" style="width:64px;height:64px;border-radius:10px" src="${imgUrl(m.image_key)}" alt="">` : `<span class="av" style="width:64px;height:64px;border-radius:10px">${esc(m.title[0])}</span>`}
       <div class="grow"><b>${esc(m.title)}</b><div class="muted">${m.ing_total} ingredients &middot; cooked ${m.times}x &middot; last ${m.date ? fmtDate(m.date) : 'no date'}</div></div>
       <span class="btn small primary">${icon('plus')}Use</span></a>`).join('') || '<div class="card pad muted">Nothing yet. Meals you add will show up here.</div>'}
-    <a class="btn block" href="#/new">${icon('plus')}New meal from scratch</a>`, 'bank');
+    <a class="btn block" href="#/new">${icon('plus')}New meal from scratch</a>`, 'bank', 'narrow');
 }
 
 async function viewRequests() {
-  shell('<p class="muted">Loading...</p>', 'requests');
+  loading('requests', 'narrow');
   const { requests } = await api('/requests');
   shell(`<div class="row between"><h1 style="margin:0">Meal requests</h1><a class="btn primary small" href="#/request">${icon('plus')}Request</a></div>
     <p class="muted">Fancy something? Suggest a meal and the cook can schedule it.</p>
@@ -458,11 +501,11 @@ async function viewRequests() {
           <a class="btn small" href="#/meal/${r.id}">View</a></div>
         ${isAdmin() ? `<form class="row" data-form="schedule" data-id="${r.id}" style="margin-top:10px"><input type="date" id="sd-${r.id}" value="${todayStr()}" required><button class="btn small primary">${icon('calendar-plus')}Schedule</button></form>` : ''}
         ${isAdmin() || r.requested_by === S.me.id ? `<button class="btn small danger" style="margin-top:8px" data-act="del-meal" data-id="${r.id}" data-back="requests">${icon('trash-2')}Remove</button>` : ''}
-      </div></div>`).join('') || '<div class="card pad muted">No requests right now.</div>'}`, 'requests');
+      </div></div>`).join('') || '<div class="card pad muted">No requests right now.</div>'}`, 'requests', 'narrow');
 }
 
 async function viewPay() {
-  shell('<p class="muted">Loading...</p>', 'pay');
+  loading('pay', 'narrow');
   const [{ rows }, { settings: s }] = await Promise.all([api('/balances'), api('/settings')]);
   S.settings = s;
   const owed = (r) => r.status !== 'confirmed';
@@ -474,7 +517,7 @@ async function viewPay() {
     const people = Object.values(by).map((u) => ({ ...u, total: u.rows.filter(owed).reduce((x, r) => x + r.amount, 0) })).sort((x, y) => y.total - x.total);
     body = `<h1>Who owes you</h1>` + (people.map((u) => `<div class="card pad">
       <div class="row between"><span class="row">${avatar(u)}<b>${esc(u.name)}</b></span><b>${u.total ? money(u.total) : '<span class="badge good">All paid</span>'}</b></div>
-      ${u.rows.filter(owed).map((r) => `<div class="row" style="padding:8px 0;border-top:1px solid var(--line)">
+      ${u.rows.filter(owed).map((r) => `<div class="row wrapflex payrow">
         <span class="grow">${esc(r.title)} <span class="muted">${fmtDate(r.date)} &middot; ${money(r.amount)}</span></span>
         ${r.status === 'claimed' ? '<span class="badge warn">Says paid</span>' : ''}
         <button class="btn small primary" data-act="pay" data-id="${r.meal_id}" data-u="${r.user_id}" data-s="confirmed">Confirm</button></div>`).join('')}
@@ -498,7 +541,7 @@ async function viewPay() {
   body += `<div class="card pad"><h2>Bank details</h2>
     ${bank.map(([k, v]) => `<div class="copyrow"><div><div class="muted">${k}</div><div class="v">${esc(v)}</div></div>
       <button class="btn small" data-act="copy" data-v="${esc(v)}">${icon('copy')}Copy</button></div>`).join('')}</div>`;
-  shell(body, 'pay');
+  shell(body, 'pay', 'narrow');
 }
 
 async function viewMe() {
@@ -524,7 +567,7 @@ async function viewMe() {
     </form>
     ${settingsHtml}
     <button class="btn block" data-act="logout">${icon('log-out')}Log out</button>
-    <p class="muted" style="text-align:center;margin-top:14px"><a href="#" data-act="replay">View the intro again</a></p>`, null);
+    <p class="muted" style="text-align:center;margin-top:14px"><a href="#" data-act="replay">View the intro again</a></p>`, 'me', 'narrow');
 }
 
 // ---------- router ----------
@@ -564,10 +607,14 @@ const ACTIONS = {
   rsvp: async (el) => {
     const cur = el.classList.contains('in') || el.classList.contains('out');
     await api(`/meals/${el.dataset.id}/rsvp`, 'POST', { status: cur ? null : el.dataset.s });
-    render();
+    await refresh();
   },
-  have: async (el) => { await api(`/ingredients/${el.dataset.id}/have`, 'POST', { have: el.checked }); render(); },
-  pay: async (el) => { await api(`/meals/${el.dataset.id}/pay`, 'POST', { user_id: el.dataset.u, status: el.dataset.s }); render(); },
+  have: async (el) => {
+    try { await api(`/ingredients/${el.dataset.id}/have`, 'POST', { have: el.checked }); }
+    catch (e) { toast(e.message); } // e.g. someone else ticked it; the refresh below puts the box back
+    await refresh();
+  },
+  pay: async (el) => { await api(`/meals/${el.dataset.id}/pay`, 'POST', { user_id: el.dataset.u, status: el.dataset.s }); await refresh(); },
   'del-meal': async (el) => {
     if (!confirm('Delete this? This cannot be undone.')) return;
     await api('/meals/' + el.dataset.id, 'DELETE');
