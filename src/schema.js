@@ -8,6 +8,7 @@ export const STATEMENTS = [
   "CREATE INDEX IF NOT EXISTS idx_ing_meal ON ingredients(meal_id)",
   "CREATE TABLE IF NOT EXISTS rsvps ( meal_id INTEGER NOT NULL, user_id TEXT NOT NULL, status TEXT NOT NULL, PRIMARY KEY (meal_id, user_id) )",
   "CREATE TABLE IF NOT EXISTS payments ( meal_id INTEGER NOT NULL, user_id TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'unpaid', updated_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (meal_id, user_id) )",
+  "CREATE TABLE IF NOT EXISTS images ( id TEXT PRIMARY KEY, type TEXT NOT NULL, data TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')) )",
   "CREATE TABLE IF NOT EXISTS settings ( key TEXT PRIMARY KEY, value TEXT NOT NULL )",
   "INSERT OR IGNORE INTO settings (key, value) VALUES ('bank_currency', 'British Pound'), ('bank_beneficiary', 'Michael Jones'), ('bank_sort_code', '04-29-09'), ('bank_account', '90918487'), ('bank_name', 'Revolut Ltd'), ('bank_address', '30 South Colonnade, E14 5HX, London, United Kingdom'), ('cook_weight', '0.5')",
   "CREATE TABLE IF NOT EXISTS catalog ( name_lc TEXT PRIMARY KEY, name TEXT NOT NULL, qty TEXT NOT NULL DEFAULT '', price_pence INTEGER NOT NULL )",

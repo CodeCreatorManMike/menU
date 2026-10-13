@@ -10,10 +10,7 @@ binding = "ASSETS"
 # Only /api/* runs the Worker; pages, scripts and styles are served straight from ./public.
 run_worker_first = ["/api/*"]
 
-# No ids on purpose: wrangler creates the database and image bucket on first deploy.
+# No id on purpose: wrangler creates the database on first deploy. Photos are stored in it too.
 [[d1_databases]]
 binding = "DB"
 database_name = "flat-feast"
-
-[[r2_buckets]]
-binding = "IMAGES"

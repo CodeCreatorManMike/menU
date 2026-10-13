@@ -1,12 +1,12 @@
 // API for every /api/* request (used by src/worker.js and local-server.mjs).
-// Bindings: DB (D1), IMAGES (R2). Secrets: ADMIN_PASSWORD, optional JOIN_CODE.
+// Bindings: DB (D1, also stores uploaded photos). Secrets: ADMIN_PASSWORD, optional JOIN_CODE.
 import { STATEMENTS } from './schema.js';
 
 // Creates the tables and default items the first time the app runs against an empty database.
 let schemaReady = false;
 async function ensureSchema(env) {
   if (schemaReady) return;
-  const has = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'catalog'").first();
+  const has = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'images'").first();
   if (!has) await env.DB.batch(STATEMENTS.map((s) => env.DB.prepare(s)));
   schemaReady = true;
 }
@@ -44,6 +44,18 @@ async function startSession(env, req, userId) {
     .bind(sid, userId, Date.now() + maxAge * 1000).run();
   const secure = new URL(req.url).protocol === 'https:' ? '; Secure' : '';
   return `sid=${sid}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`;
+}
+
+function toBase64(bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+function fromBase64(b64) {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
 }
 
 async function getSettings(env) {
@@ -203,10 +215,10 @@ async function route(request, env, url, p, method) {
   }
 
   if (p[0] === 'img' && p[1] && method === 'GET') {
-    const obj = await env.IMAGES.get('img/' + p[1].replace(/[^a-z0-9]/gi, ''));
-    if (!obj) return new Response('Not found', { status: 404 });
-    return new Response(obj.body, {
-      headers: { 'content-type': obj.httpMetadata?.contentType || 'image/jpeg', 'cache-control': 'public, max-age=31536000, immutable' },
+    const row = await env.DB.prepare('SELECT type, data FROM images WHERE id = ?').bind(p[1].replace(/[^a-z0-9]/gi, '')).first();
+    if (!row) return new Response('Not found', { status: 404 });
+    return new Response(fromBase64(row.data), {
+      headers: { 'content-type': row.type || 'image/jpeg', 'cache-control': 'public, max-age=31536000, immutable' },
     });
   }
 
@@ -242,10 +254,10 @@ async function route(request, env, url, p, method) {
     const type = request.headers.get('content-type') || '';
     if (!type.startsWith('image/')) return fail('Images only');
     const buf = await request.arrayBuffer();
-    if (buf.byteLength > 3 * 1024 * 1024) return fail('Image too large (max 3MB)');
+    if (buf.byteLength > 1200 * 1024) return fail('Image too large (max 1.2MB)');
     if (buf.byteLength < 100) return fail('Empty image');
     const key = rid();
-    await env.IMAGES.put('img/' + key, buf, { httpMetadata: { contentType: type } });
+    await env.DB.prepare('INSERT INTO images (id, type, data) VALUES (?, ?, ?)').bind(key, type.slice(0, 40), toBase64(new Uint8Array(buf))).run();
     return json({ key });
   }
 

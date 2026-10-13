@@ -55,6 +55,13 @@ CREATE TABLE IF NOT EXISTS payments (
   PRIMARY KEY (meal_id, user_id)
 );
 
+CREATE TABLE IF NOT EXISTS images (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,
+  data TEXT NOT NULL, -- base64
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL

@@ -1,5 +1,5 @@
 // Local runner: serves public/ and the same API code Cloudflare runs, using Node's
-// built-in SQLite instead of D1 and a folder instead of R2. No Cloudflare account,
+// built-in SQLite instead of D1. No Cloudflare account,
 // no wrangler, nothing to install. Needs Node 22.5 or newer.
 //
 //   node local-server.mjs          start on http://localhost:8787
@@ -24,7 +24,7 @@ try {
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const local = path.join(root, '.local');
-fs.mkdirSync(path.join(local, 'images'), { recursive: true });
+fs.mkdirSync(local, { recursive: true });
 
 const { onRequest } = await import(pathToFileURL(path.join(root, 'src/api.js')).href);
 
@@ -42,7 +42,6 @@ const stmt = (sql) => {
   };
   return o;
 };
-const safeKey = (k) => path.join(local, 'images', k.replace(/[^a-z0-9]/gi, '_'));
 const env = {
   ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || 'changeme',
   JOIN_CODE: process.env.JOIN_CODE || undefined,
@@ -52,18 +51,6 @@ const env = {
       sqlite.exec('BEGIN');
       try { list.forEach((s) => s._run()); sqlite.exec('COMMIT'); } catch (e) { sqlite.exec('ROLLBACK'); throw e; }
       return [];
-    },
-  },
-  IMAGES: {
-    put: async (k, buf, o) => {
-      fs.writeFileSync(safeKey(k), Buffer.from(buf));
-      fs.writeFileSync(safeKey(k) + '.type', o?.httpMetadata?.contentType || 'image/jpeg');
-    },
-    get: async (k) => {
-      const f = safeKey(k);
-      if (!fs.existsSync(f)) return null;
-      const type = fs.existsSync(f + '.type') ? fs.readFileSync(f + '.type', 'utf8') : 'image/jpeg';
-      return { body: fs.readFileSync(f), httpMetadata: { contentType: type } };
     },
   },
 };

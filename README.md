@@ -1,6 +1,6 @@
 # Flat Feast
 
-A small web app for a shared flat where one person cooks big meals and everyone else chooses whether to join. The cook posts meals with ingredients and a photo, flatmates opt in or out, the cost is split so the cook always pays less, and each flatmate can copy the cook's bank details one item at a time to pay. It runs as a Cloudflare Worker with static assets, D1 for data and R2 for images, and deploys straight from GitHub.
+A small web app for a shared flat where one person cooks big meals and everyone else chooses whether to join. The cook posts meals with ingredients and a photo, flatmates opt in or out, the cost is split so the cook always pays less, and each flatmate can copy the cook's bank details one item at a time to pay. It runs as a single Cloudflare Worker with static assets and a D1 database (which also stores the photos), and deploys straight from GitHub.
 
 ## Repository Structure
 
@@ -20,7 +20,7 @@ menU/
 │   └── gen-schema.mjs    Builds src/schema.js from schema.sql
 ├── schema.sql            Tables, default settings (including bank details) and default items
 ├── local-server.mjs      Zero install local runner (Node 22.5+), optional demo data
-├── wrangler.toml         Worker, static assets, D1 and R2 bindings
+├── wrangler.toml         Worker, static assets and D1 binding
 ├── package.json          Scripts and wrangler dependency
 └── README.md
 ```
@@ -61,12 +61,12 @@ With a total T, N flatmates opted in and a cook share W (default 0.5), each flat
 The repository deploys with `npx wrangler deploy`, which is what Cloudflare's Git integration (Workers Builds) runs on every push to `main`.
 
 1. In the Cloudflare dashboard go to Workers and Pages, create an application, import this GitHub repository and keep the default deploy command `npx wrangler deploy`. If the build reports a name mismatch, set `name` in `wrangler.toml` to the project name shown in the dashboard.
-2. On the first deploy wrangler creates the D1 database and R2 bucket from the bindings in `wrangler.toml`. The tables and the default item catalogue are created automatically on the first request, so there is nothing to run by hand.
+2. On the first deploy wrangler creates the D1 database from the binding in `wrangler.toml`. There is no separate image bucket; photos are stored in the database. The tables and the default item catalogue are created automatically on the first request, so there is nothing to run by hand.
 3. In the Worker's Settings, Variables and Secrets, add a secret called `ADMIN_PASSWORD`. This is the cook login password.
 4. Optional: add a secret called `JOIN_CODE` so only people who know the code can sign up.
 5. Open the `workers.dev` address shown at the top of the Worker's page in the dashboard.
 
-If the build says it cannot create the database or bucket automatically, create them in the dashboard and add their `database_id` and `bucket_name` to `wrangler.toml`.
+If the build says it cannot create the database automatically, create a D1 database in the dashboard and add its `database_id` to `wrangler.toml`.
 
 To deploy from your own machine instead, run `npm install`, `npx wrangler login` and `npm run deploy`, then add the secrets as above.
 
@@ -87,7 +87,7 @@ To run it the way Cloudflare does, create a `.dev.vars` file containing `ADMIN_P
 ## Concepts Covered
 
 - A Cloudflare Worker serving static assets and an API
-- D1 and R2 bindings with automatic provisioning and first run schema setup
+- A D1 binding with automatic provisioning, first run schema setup, and photos stored as base64 rows
 - Cookie sessions and admin versus user permissions
 - Hash routed single page app in vanilla JavaScript
 - Client side image resizing before upload
