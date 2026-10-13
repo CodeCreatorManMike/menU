@@ -11,7 +11,8 @@ menU/
 │   ├── app.js            Single page front end (onboarding, home, calendar, bank, requests, pay)
 │   ├── style.css         Mobile first styles, responsive breakpoints and dark mode
 │   ├── manifest.json     Home screen app details
-│   └── icon.svg          App icon (plus icon-192.png, icon-512.png and apple-touch-icon.png)
+│   ├── logo.png          menU wordmark (logo-dark.png is the dark mode version)
+│   └── icon-*.png        Tab and home screen icon (32, 192, 512) and apple-touch-icon.png
 ├── src/
 │   ├── worker.js         Worker entry: /api/* to the API, everything else to public/
 │   ├── api.js            All API routes, cost splitting and first run database setup

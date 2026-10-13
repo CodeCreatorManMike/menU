@@ -44,6 +44,7 @@ h1 { font-size: 1.6rem; } h2 { font-size: 1.15rem; } h3 { font-size: 1rem; }
 .wrap.mid { max-width: 720px; }
 .top { display: flex; align-items: center; justify-content: space-between; padding: 14px max(16px, env(safe-area-inset-right)) 6px max(16px, env(safe-area-inset-left)); max-width: 720px; margin: 0 auto; }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.2rem; color: var(--ink); text-decoration: none; }
+.wordmark { display: block; height: 30px; width: auto; }
 .logo { width: 36px; height: 36px; border-radius: 12px; background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: var(--brand-ink); display: inline-flex; align-items: center; justify-content: center; box-shadow: var(--shadow); }
 .logo .ic, .logo .lucide { width: 20px; height: 20px; }
 .muted { color: var(--muted); font-size: .9rem; }
@@ -222,7 +223,8 @@ input[type=file]::file-selector-button { margin-right: 10px; border: 0; backgrou
   .wrap.narrow { max-width: 680px; }
   .nav { top: 0; right: auto; bottom: 0; left: 0; width: 252px; padding: 22px 14px calc(18px + env(safe-area-inset-bottom)); background: var(--card); backdrop-filter: none; border-top: 0; border-right: 1px solid var(--line); justify-content: flex-start; overflow-y: auto; }
   .nav .in { flex-direction: column; max-width: none; padding: 0; gap: 4px; }
-  .nav .nav-brand { display: inline-flex; flex: none; justify-content: flex-start; min-height: 0; padding: 4px 10px 22px; font-size: 1.35rem; color: var(--ink); background: none; text-align: left; }
+  .nav .nav-brand { display: inline-flex; flex: none; justify-content: flex-start; min-height: 0; padding: 6px 12px 24px; background: none; text-align: left; }
+  .nav-brand .wordmark { height: 38px; }
   .nav a:not(.nav-brand) { flex: none; display: flex; align-items: center; justify-content: flex-start; gap: 12px; text-align: left; font-size: .96rem; padding: 11px 14px; min-height: 0; }
   .nav a b { display: inline-flex; }
   .nav a b .ic, .nav a b .lucide { width: 22px; height: 22px; margin: 0; }
@@ -250,3 +252,6 @@ input[type=file]::file-selector-button { margin-right: 10px; border: 0; backgrou
 /* Dark mode: dark text on the lighter green and red buttons */
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.in, :root:not([data-theme="light"]) .btn.out { color: #1b1511; } }
 :root[data-theme="dark"] .btn.in, :root[data-theme="dark"] .btn.out { color: #1b1511; }
+
+.ob-appicon { width: 104px; height: 104px; display: block; filter: drop-shadow(0 8px 18px rgba(138, 84, 30, .25)); }
+@media (min-width: 760px) { .ob.wide .ob-appicon { width: 132px; height: 132px; } }

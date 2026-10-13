@@ -9,6 +9,8 @@ const imgUrl = (k) => (k ? '/api/img/' + k : '');
 const todayStr = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date());
 const fmtDate = (d) => !d ? 'Date to be decided' : new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 // Lucide icons (https://lucide.dev). <i data-lucide="name"> tags are swapped for SVGs after each render.
+// menU wordmark (light and dark versions) and app icon.
+const logoImg = () => `<picture><source srcset="/logo-dark.png" media="(prefers-color-scheme: dark)"><img class="wordmark" src="/logo.png" alt="menU" width="112" height="30"></picture>`;
 const icon = (name, cls = '') => `<i data-lucide="${name}" class="ic ${cls}" aria-hidden="true"></i>`;
 let iconQueued = false;
 function drawIcons() {
@@ -96,12 +98,12 @@ function shell(inner, active, cls = '') {
   const tab = (href, ic, label, key) => `<a href="${href}" class="${active === key ? 'on' : ''}"${active === key ? ' aria-current="page"' : ''}><b>${icon(ic)}</b><span>${label}</span></a>`;
   $app.innerHTML = `
     <div class="top">
-      <a class="brand" href="#/"><span class="logo">${icon('chef-hat')}</span>menU</a>
+      <a class="brand" href="#/" aria-label="menU home">${logoImg()}</a>
       <a href="#/me" aria-label="Profile">${avatar(S.me)}</a>
     </div>
     <main class="wrap ${cls}">${inner}</main>
     <nav class="nav" aria-label="Main"><div class="in">
-      <a class="brand nav-brand" href="#/"><span class="logo">${icon('chef-hat')}</span>menU</a>
+      <a class="brand nav-brand" href="#/" aria-label="menU home">${logoImg()}</a>
       ${tab('#/', 'house', 'Home', 'home')}
       ${tab('#/calendar', 'calendar-days', 'Calendar', 'calendar')}
       ${tab('#/requests', 'lightbulb', 'Requests', 'requests')}
@@ -124,7 +126,7 @@ async function refresh() {
 const mav = (t) => `<span class="av sm">${t}</span>`;
 const SLIDES = [
   { title: 'Cook once, share the table', text: 'Your flat cook posts the meals. You choose what you want, and the cost is split fairly.',
-    art: () => `<div class="ob-logo">${icon('chef-hat')}</div>
+    art: () => `<img class="ob-appicon" src="/icon-192.png" alt="" width="104" height="104">
       <div class="ob-chips"><span class="chip">${icon('utensils')}Meals</span><span class="chip">${icon('users')}Flatmates</span><span class="chip">${icon('pound-sterling')}Fair split</span></div>` },
   { title: "See what's cooking", text: "The home page shows tonight's meal and everything coming up, with the price per person.",
     art: () => `<div class="mini"><div class="mini-hero">${icon('utensils')}</div>
@@ -150,7 +152,7 @@ const SLIDES = [
       <div class="copyrow"><div><div class="muted">Account number</div><div class="v">12345678</div></div><span class="btn small">${icon('copy')}Copy</span></div></div>` },
 ];
 
-const authTop = () => `<div class="ob-top"><span class="brand"><span class="logo">${icon('chef-hat')}</span>menU</span></div>`;
+const authTop = () => `<div class="ob-top"><span class="brand">${logoImg()}</span></div>`;
 
 function viewAuth() {
   document.body.classList.remove('has-nav');
@@ -158,7 +160,7 @@ function viewAuth() {
     const s = SLIDES[S.ob];
     const last = S.ob === SLIDES.length - 1;
     $app.innerHTML = `<div class="ob wide">
-      <div class="ob-top"><span class="brand"><span class="logo">${icon('chef-hat')}</span>menU</span><button class="linkbtn" data-act="ob-profile">Skip</button></div>
+      <div class="ob-top"><span class="brand">${logoImg()}</span><button class="linkbtn" data-act="ob-profile">Skip</button></div>
       <div class="ob-progress" role="progressbar" aria-valuemin="1" aria-valuemax="${SLIDES.length}" aria-valuenow="${S.ob + 1}"><i style="width:${((S.ob + 1) / SLIDES.length) * 100}%"></i></div>
       <div class="muted ob-step">Step ${S.ob + 1} of ${SLIDES.length}</div>
       <div class="ob-body"><div class="ob-stage">${s.art()}</div>
