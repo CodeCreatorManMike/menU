@@ -8,6 +8,16 @@ const money = (p) => '£' + ((p || 0) / 100).toFixed(2);
 const imgUrl = (k) => (k ? '/api/img/' + k : '');
 const todayStr = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date());
 const fmtDate = (d) => !d ? 'Date to be decided' : new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+// Lucide icons (https://lucide.dev). <i data-lucide="name"> tags are swapped for SVGs after each render.
+const icon = (name, cls = '') => `<i data-lucide="${name}" class="ic ${cls}" aria-hidden="true"></i>`;
+let iconQueued = false;
+function drawIcons() {
+  if (iconQueued) return;
+  iconQueued = true;
+  requestAnimationFrame(() => { iconQueued = false; if (window.lucide) window.lucide.createIcons(); });
+}
+new MutationObserver(drawIcons).observe(document.getElementById('app'), { childList: true, subtree: true });
+window.addEventListener('load', drawIcons);
 const isAdmin = () => !!(S.me && S.me.is_admin);
 
 async function api(path, method = 'GET', body) {
@@ -75,7 +85,7 @@ function fallbackCopy(v, done) {
 // ---------- shell ----------
 function shell(inner, active) {
   const a = isAdmin();
-  const tab = (href, icon, label, key) => `<a href="${href}" class="${active === key ? 'on' : ''}"><b>${icon}</b>${label}</a>`;
+  const tab = (href, ic, label, key) => `<a href="${href}" class="${active === key ? 'on' : ''}"><b>${icon(ic)}</b>${label}</a>`;
   $app.innerHTML = `
     <div class="top">
       <a class="brand" href="#/">Flat Feast</a>
@@ -83,11 +93,11 @@ function shell(inner, active) {
     </div>
     <div class="wrap">${inner}</div>
     <nav class="nav"><div class="in">
-      ${tab('#/', '🍽', 'Home', 'home')}
-      ${tab('#/calendar', '📅', 'Calendar', 'calendar')}
-      ${tab('#/requests', '💡', 'Requests', 'requests')}
-      ${a ? tab('#/bank', '📚', 'Meal bank', 'bank') : ''}
-      ${tab('#/pay', '💷', a ? 'Owed' : 'Pay', 'pay')}
+      ${tab('#/', 'house', 'Home', 'home')}
+      ${tab('#/calendar', 'calendar-days', 'Calendar', 'calendar')}
+      ${tab('#/requests', 'lightbulb', 'Requests', 'requests')}
+      ${a ? tab('#/bank', 'library', 'Meal bank', 'bank') : ''}
+      ${tab('#/pay', 'pound-sterling', a ? 'Owed' : 'Pay', 'pay')}
     </div></nav>`;
 }
 
@@ -163,17 +173,17 @@ function shareLine(m) {
 function rsvpButtons(m) {
   if (isAdmin()) return '';
   return `<div class="seg" style="margin-top:10px">
-    <button class="btn ${m.my_rsvp === 'in' ? 'in' : ''}" data-act="rsvp" data-id="${m.id}" data-s="in">I'm in</button>
-    <button class="btn ${m.my_rsvp === 'out' ? 'out' : ''}" data-act="rsvp" data-id="${m.id}" data-s="out">Count me out</button>
+    <button class="btn ${m.my_rsvp === 'in' ? 'in' : ''}" data-act="rsvp" data-id="${m.id}" data-s="in">${icon('check')}I'm in</button>
+    <button class="btn ${m.my_rsvp === 'out' ? 'out' : ''}" data-act="rsvp" data-id="${m.id}" data-s="out">${icon('x')}Count me out</button>
   </div>`;
 }
 function mealCard(m, today) {
   const label = !m.date ? '<span class="badge warn">Date to be decided</span>' : m.date === today ? '<span class="badge">Today</span>' : `<span class="muted">${fmtDate(m.date)}</span>`;
-  const hero = m.image_key ? `<img class="hero" src="${imgUrl(m.image_key)}" alt="" loading="lazy">` : `<div class="hero ph">${esc(m.title[0] || '?')}</div>`;
+  const hero = m.image_key ? `<img class="hero" src="${imgUrl(m.image_key)}" alt="" loading="lazy">` : `<div class="hero ph">${icon('utensils', 'big')}</div>`;
   return `<div class="card">
     <a href="#/meal/${m.id}" style="color:inherit;text-decoration:none">${hero}
       <div class="pad" style="padding-bottom:0">
-        <div class="row between">${label}<span class="muted">Cook: ${esc(m.cook_name || '')}</span></div>
+        <div class="row between">${label}<span class="muted">${icon('chef-hat')}${esc(m.cook_name || '')}</span></div>
         <h2 style="margin-top:4px">${esc(m.title)}</h2>
         <div class="row between wrapflex"><span>${shareLine(m)}</span>
           <span class="row" style="gap:6px">${stackAv(m.ins)}<span class="muted">${m.ins.length} in</span></span></div>
@@ -189,7 +199,7 @@ async function viewHome() {
   const tod = meals.filter((m) => m.date === today);
   const later = meals.filter((m) => m.date > today);
   shell(`
-    ${isAdmin() ? '<a class="btn primary block" href="#/new" style="margin-bottom:14px">+ Add a meal</a>' : ''}
+    ${isAdmin() ? `<a class="btn primary block" href="#/new" style="margin-bottom:14px">${icon('plus')}Add a meal</a>` : ''}
     <div class="sectionhead"><h2>Today</h2></div>
     ${tod.length ? tod.map((m) => mealCard(m, today)).join('') : '<div class="card pad muted">No meal planned for today.</div>'}
     <div class="sectionhead"><h2>Coming up</h2></div>
@@ -219,7 +229,7 @@ async function viewCalendar(params) {
   const label = first.toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
   shell(`
     <div class="row between" style="margin-bottom:10px">
-      <a class="btn small" href="#/calendar?m=${shift(-1)}">&lt;</a><h2 style="margin:0">${label}</h2><a class="btn small" href="#/calendar?m=${shift(1)}">&gt;</a>
+      <a class="btn small" href="#/calendar?m=${shift(-1)}" aria-label="Previous month">${icon('chevron-left')}</a><h2 style="margin:0">${label}</h2><a class="btn small" href="#/calendar?m=${shift(1)}" aria-label="Next month">${icon('chevron-right')}</a>
     </div>
     <div class="cal">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => `<div class="dow">${d}</div>`).join('')}${cells}</div>
     ${isAdmin() ? '<p class="muted" style="margin-top:12px">Tap an empty day to add a meal on that date.</p>' : ''}
@@ -289,11 +299,11 @@ async function viewMeal(id) {
       ${m.outs.length ? `<h3 style="margin-top:12px">Out</h3><div class="row wrapflex">${m.outs.map((u) => `<span class="row muted" style="gap:6px">${avatar(u, 'sm')}${esc(u.name)}</span>`).join('')}</div>` : ''}
     </div>` : ''}
     ${payBlock}
-    ${a && m.status === 'scheduled' && !m.date ? `<form class="card pad row" data-form="schedule" data-id="${m.id}"><input type="date" id="sd-${m.id}" value="${todayStr()}" required><button class="btn small primary">Set date</button></form>` : ''}
+    ${a && m.status === 'scheduled' && !m.date ? `<form class="card pad row" data-form="schedule" data-id="${m.id}"><input type="date" id="sd-${m.id}" value="${todayStr()}" required><button class="btn small primary">${icon('calendar-plus')}Set date</button></form>` : ''}
     ${a ? `<div class="row wrapflex">
-      <a class="btn" href="#/edit/${m.id}">Edit</a>
-      <a class="btn" href="#/new?from=${m.id}">Cook again</a>
-      <button class="btn danger" data-act="del-meal" data-id="${m.id}">Delete</button></div>` : ''}
+      <a class="btn" href="#/edit/${m.id}">${icon('pencil')}Edit</a>
+      <a class="btn" href="#/new?from=${m.id}">${icon('repeat')}Cook again</a>
+      <button class="btn danger" data-act="del-meal" data-id="${m.id}">${icon('trash-2')}Delete</button></div>` : ''}
   `, 'home');
 }
 
@@ -331,10 +341,10 @@ function renderForm() {
       <input class="i-name" list="price-bank" placeholder="Ingredient" value="${esc(i.name)}">
       <input class="i-qty" placeholder="Qty" value="${esc(i.qty)}">
       <input class="i-price" inputmode="decimal" placeholder="£" value="${esc(i.price)}">
-      <button type="button" class="btn small" data-act="rm-ing" data-n="${n}" aria-label="Remove">x</button>
+      <button type="button" class="btn small" data-act="rm-ing" data-n="${n}" aria-label="Remove">${icon('x')}</button>
     </div>`).join('');
   shell(`<h1>${title}</h1>
-    ${admin && !F.id ? '<a class="btn block" href="#/bank" style="margin-bottom:12px">Pick from meal bank</a>' : ''}
+    ${admin && !F.id ? `<a class="btn block" href="#/bank" style="margin-bottom:12px">${icon('library')}Pick from meal bank</a>` : ''}
     <form class="card pad" data-form="meal">
       <div class="imgpick"><span id="f-prev">${F.image_key ? `<img src="${imgUrl(F.image_key)}" alt="">` : '<img alt="" style="visibility:hidden">'}</span>
         <div class="grow"><label style="margin-top:0">Photo of the meal</label><input type="file" id="f-file" accept="image/*"></div></div>
@@ -344,8 +354,8 @@ function renderForm() {
       <label>Ingredients <span class="muted">(prices are estimates, check Tesco if you like)</span></label>
       <datalist id="price-bank">${F.bank.map((b) => `<option value="${esc(b.name)}"></option>`).join('')}</datalist>
       ${rows}
-      <div class="row" style="margin-top:6px"><button type="button" class="btn small" data-act="add-ing">+ Add ingredient</button>
-        <a class="btn small" id="tesco-link" target="_blank" rel="noopener" href="https://www.tesco.com/groceries/en-GB/search?query=">Search Tesco</a></div>
+      <div class="row" style="margin-top:6px"><button type="button" class="btn small" data-act="add-ing">${icon('plus')}Add ingredient</button>
+        <a class="btn small" id="tesco-link" target="_blank" rel="noopener" href="https://www.tesco.com/groceries/en-GB/search?query=">${icon('search')}Search Tesco</a></div>
       <div class="totals" id="f-sum" style="margin-top:12px"></div>
       ${admin ? `<label>Total price to split £ <span class="muted">(leave blank to use the ingredient total)</span></label><input id="f-total" inputmode="decimal" value="${esc(F.total)}">` : ''}
       <button class="btn primary block" style="margin-top:16px">${admin ? 'Save meal' : 'Send request'}</button>
@@ -404,14 +414,14 @@ async function viewBank() {
     ${meals.map((m) => `<a class="card row" style="text-decoration:none;color:inherit;padding:10px" href="#/new?from=${m.id}">
       ${m.image_key ? `<img class="av" style="width:64px;height:64px;border-radius:10px" src="${imgUrl(m.image_key)}" alt="">` : `<span class="av" style="width:64px;height:64px;border-radius:10px">${esc(m.title[0])}</span>`}
       <div class="grow"><b>${esc(m.title)}</b><div class="muted">${m.ing_total} ingredients &middot; cooked ${m.times}x &middot; last ${m.date ? fmtDate(m.date) : 'no date'}</div></div>
-      <span class="btn small primary">Use</span></a>`).join('') || '<div class="card pad muted">Nothing yet. Meals you add will show up here.</div>'}
-    <a class="btn block" href="#/new">+ New meal from scratch</a>`, 'bank');
+      <span class="btn small primary">${icon('plus')}Use</span></a>`).join('') || '<div class="card pad muted">Nothing yet. Meals you add will show up here.</div>'}
+    <a class="btn block" href="#/new">${icon('plus')}New meal from scratch</a>`, 'bank');
 }
 
 async function viewRequests() {
   shell('<p class="muted">Loading...</p>', 'requests');
   const { requests } = await api('/requests');
-  shell(`<div class="row between"><h1 style="margin:0">Meal requests</h1><a class="btn primary small" href="#/request">+ Request</a></div>
+  shell(`<div class="row between"><h1 style="margin:0">Meal requests</h1><a class="btn primary small" href="#/request">${icon('plus')}Request</a></div>
     <p class="muted">Fancy something? Suggest a meal and the cook can schedule it.</p>
     ${requests.map((r) => `<div class="card">
       ${r.image_key ? `<img class="hero" src="${imgUrl(r.image_key)}" alt="" loading="lazy">` : ''}
@@ -420,8 +430,8 @@ async function viewRequests() {
         ${r.description ? `<p style="white-space:pre-wrap">${esc(r.description)}</p>` : ''}
         <div class="row between wrapflex"><span class="row muted" style="gap:6px">${avatar({ name: r.requester_name, avatar_key: r.requester_avatar }, 'sm')}${esc(r.requester_name || '')} &middot; ${r.ing_total} ingredients</span>
           <a class="btn small" href="#/meal/${r.id}">View</a></div>
-        ${isAdmin() ? `<form class="row" data-form="schedule" data-id="${r.id}" style="margin-top:10px"><input type="date" id="sd-${r.id}" value="${todayStr()}" required><button class="btn small primary">Schedule</button></form>` : ''}
-        ${isAdmin() || r.requested_by === S.me.id ? `<button class="btn small danger" style="margin-top:8px" data-act="del-meal" data-id="${r.id}" data-back="requests">Remove</button>` : ''}
+        ${isAdmin() ? `<form class="row" data-form="schedule" data-id="${r.id}" style="margin-top:10px"><input type="date" id="sd-${r.id}" value="${todayStr()}" required><button class="btn small primary">${icon('calendar-plus')}Schedule</button></form>` : ''}
+        ${isAdmin() || r.requested_by === S.me.id ? `<button class="btn small danger" style="margin-top:8px" data-act="del-meal" data-id="${r.id}" data-back="requests">${icon('trash-2')}Remove</button>` : ''}
       </div></div>`).join('') || '<div class="card pad muted">No requests right now.</div>'}`, 'requests');
 }
 
@@ -448,7 +458,7 @@ async function viewPay() {
     const total = mine.reduce((x, r) => x + r.amount, 0);
     body = `<h1>Pay the cook</h1>
       <div class="totals" style="margin-bottom:14px"><div class="line big"><span>You owe</span><span>${money(total)}</span></div>
-        <div class="row" style="margin-top:8px"><button class="btn small" data-act="copy" data-v="${(total / 100).toFixed(2)}">Copy amount</button></div></div>
+        <div class="row" style="margin-top:8px"><button class="btn small" data-act="copy" data-v="${(total / 100).toFixed(2)}">${icon('copy')}Copy amount</button></div></div>
       ${mine.map((r) => `<div class="card pad row">
         <div class="grow"><b>${esc(r.title)}</b><div class="muted">${fmtDate(r.date)} &middot; ${money(r.amount)}</div></div>
         ${r.status === 'claimed'
@@ -461,7 +471,7 @@ async function viewPay() {
   ].filter(([, v]) => v);
   body += `<div class="card pad"><h2>Bank details</h2>
     ${bank.map(([k, v]) => `<div class="copyrow"><div><div class="muted">${k}</div><div class="v">${esc(v)}</div></div>
-      <button class="btn small" data-act="copy" data-v="${esc(v)}">Copy</button></div>`).join('')}</div>`;
+      <button class="btn small" data-act="copy" data-v="${esc(v)}">${icon('copy')}Copy</button></div>`).join('')}</div>`;
   shell(body, 'pay');
 }
 
@@ -487,7 +497,7 @@ async function viewMe() {
       <button class="btn primary block" style="margin-top:14px">Save</button>
     </form>
     ${settingsHtml}
-    <button class="btn block" data-act="logout">Log out</button>
+    <button class="btn block" data-act="logout">${icon('log-out')}Log out</button>
     <p class="muted" style="text-align:center;margin-top:14px"><a href="#" data-act="replay">View the intro again</a></p>`, null);
 }
 

@@ -79,3 +79,12 @@ textarea { min-height: 80px; resize: vertical; }
 .imgpick img { width: 84px; height: 84px; object-fit: cover; border-radius: 12px; background: var(--soft); }
 .sectionhead { display: flex; justify-content: space-between; align-items: baseline; margin: 18px 0 8px; }
 [hidden] { display: none !important; }
+
+/* Lucide icons */
+.ic, .lucide { width: 1.15em; height: 1.15em; stroke-width: 2; flex: none; vertical-align: -0.2em; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+a.btn.block, button.btn.block { display: flex; }
+.btn.small .ic, .btn.small .lucide { width: 1em; height: 1em; }
+.muted .ic, .muted .lucide { width: 1em; height: 1em; margin-right: 4px; }
+.nav a b .ic, .nav a b .lucide { width: 24px; height: 24px; display: block; margin: 0 auto 2px; }
+.hero.ph .ic, .hero.ph .lucide { width: 44px; height: 44px; }
